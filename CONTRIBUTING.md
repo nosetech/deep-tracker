@@ -44,4 +44,9 @@ git switch -c feature/<内容>
 
 ## ブランチ保護
 
-`master`・`develop` は、直接pushを禁止しPRを必須とする運用とする。リポジトリ設定（Branch protection / Rulesets）での強制は管理者権限が必要なため、設定内容はユーザーの確認後に実施する。
+`master`・`develop` には、GitHubのブランチ保護で次を設定している。
+
+- PR必須（直接push禁止）
+- 管理者にも適用（例外なし）
+- レビュー承認は必須にしない（利用者が1名のため）
+- force pushとブランチ削除を禁止
