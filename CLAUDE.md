@@ -4,7 +4,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## リポジトリの現状
 
-`deep-tracker` は、RSSリーダー + AIによる要約システム。現時点では**設計フェーズ**で、アプリケーションコードはまだ存在しない。要件と開発計画は `docs/requirements.md` を読むこと。実装フェーズはフェーズ0（基盤）から始まる。ビルド・lint・テストのコマンドは、フェーズ0で確定してから本ファイルに追記する。
+`deep-tracker` は、RSSリーダー + AIによる要約システム。現在フェーズ0（基盤）で、`backend/` と `frontend/` の雛形がある。要件と開発計画は `docs/requirements.md`、技術選定は `docs/architecture.md` を読むこと。
+
+## ビルド・lint・テストのコマンド
+
+backend（`backend/` で実行。uv + ruff + pytest）:
+
+- セットアップ: `uv sync`
+- 起動: `uv run python -m deep_tracker.main`（`127.0.0.1:8700`）
+- lint: `uv run ruff check .` / `uv run ruff format --check .`（整形は `uv run ruff format .`）
+- テスト: `uv run pytest`
+
+frontend（`frontend/` で実行。npm）:
+
+- セットアップ: `npm install`
+- 起動: `npm run dev`（`:3700`。`/api/*` は `BACKEND_URL` へ中継）
+- lint: `npm run lint` / `npm run format:check`（整形は `npm run format`）
+- 型チェック: `npm run typecheck`
+- ビルド: `npm run build`（`NODE_ENV` が `development` だと失敗する場合は `env -u NODE_ENV npm run build`）
 
 ## 画面デザインの実装ルール
 

@@ -1,0 +1,11 @@
+# 実ファイルは config/config.yaml としてコピーして編集する（.gitignore 対象）。
+# 変更の反映にはアプリの再起動が必要。
+# 注: 現時点のバックエンドはこのファイルをまだ読み込まない（設定の読み込みは別issueで実装）。
+instance: default # 並行稼働時はバージョン番号など。launchdジョブ名に使う
+backend:
+  port: 8700
+frontend:
+  host: 127.0.0.1 # LAN公開する場合は 0.0.0.0
+  port: 3700
+db:
+  path: data/deep-tracker.db
