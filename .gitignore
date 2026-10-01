@@ -1,1 +1,27 @@
+# 設定の実ファイル（*.yaml.example のみコミットする）
+config/*.yaml
+
+# DB・ログ
+data/
+logs/
+*.db
+*.db-shm
+*.db-wal
+
+# Python
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Node.js
+node_modules/
+
+# OS・エディタ
+.DS_Store
+.idea/
+.vscode/
+
+# Serena
 .serena/
