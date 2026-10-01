@@ -17,7 +17,7 @@ RSSリーダー + AIによる要約システム。元ネタは Inkdrop のノー
 | 利用者 | 1名のみ。認証なし（同一Wi-Fi内、外出時はVPN経由） |
 | フロント | Next.js / TypeScript |
 | バック | Python |
-| DB | 元記事とAI処理結果を保存（SQLiteを第一候補。実装時に確定） |
+| DB | 元記事とAI処理結果を保存（SQLiteに確定。詳細は [architecture.md](./architecture.md)） |
 | AI | ローカルPCの Claude Code（Claude Pro/Max等のサブスクリプション）。Codex・APIへ将来拡張できるよう抽象化する。producer-desk の実装を参考にする |
 | AI利用上限 | アプリ側では設けない。サブスクリプションの制限に達したらエラーを返す |
 | 学習方式 | 興味情報とフィードバック履歴をプロンプトに含める（軽量な方式） |
@@ -74,5 +74,4 @@ RSSリーダー + AIによる要約システム。元ネタは Inkdrop のノー
 
 ## 7. 未決事項
 
-- DB・Pythonフレームワーク・パッケージ管理などの実装技術の確定（フェーズ0）
-- 複数バージョン並行稼働時の launchd ジョブ名・ポートの割り当て方
+なし。実装技術（DB・Webフレームワーク・パッケージ管理・通信方式）と複数バージョン並行稼働時の割り当て方針は [architecture.md](./architecture.md) で確定した。
