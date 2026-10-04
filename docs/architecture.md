@@ -74,6 +74,7 @@ backend/
   pyproject.toml
   uv.lock
   alembic.ini
+  migrations/     # Alembic（env.py / versions/）
   deep_tracker/   # api / db / feeds / ai / jobs / config
   tests/
 frontend/
@@ -85,3 +86,93 @@ config/
 ```
 
 実ファイルの `config.yaml` は `.gitignore` に入れる。
+
+## 5. DBスキーマ
+
+定義は `backend/deep_tracker/db/models.py`（SQLAlchemy）、マイグレーションは `backend/migrations/versions/`（Alembic）。
+
+### 5-1. 共通方針
+
+- DBパスは設定 `db.path` から取得する。`upgrade_db()` が最新まで適用し、DBファイルが無ければ（親ディレクトリごと）作成する。アプリ起動時に呼ぶ想定。CLI からは `DEEP_TRACKER_CONFIG` を設定して `uv run alembic upgrade head` でも実行できる。
+- 接続ごとに `journal_mode=WAL`・`foreign_keys=ON`・`busy_timeout=5000` を設定する（`create_db_engine()`）。
+- 日時は UTC で保存する。SQLite はタイムゾーンを保持しないため、`UtcDateTime` 型が書き込み時に UTC の naive 値へ変換し、読み出し時に UTC を付ける。naive な datetime の書き込みはエラーにする。
+- 制約・索引の名前は命名規則（`naming_convention`）で固定する。SQLite の batch mode でのスキーマ変更に必要。
+- モデルとマイグレーションの乖離はテスト（`test_migration_matches_models`）で検出する。
+
+### 5-2. テーブル
+
+**feeds**（購読フィード）
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| id | integer PK | |
+| name | text | 表示名 |
+| url | text UNIQUE | フィードURL（同一URLの二重購読を防ぐ） |
+| fetch_interval_minutes | integer NULL | 取得間隔。NULL は設定 `feed.fetch_interval_minutes` を使う |
+| enabled | boolean | 有効/無効（既定 true） |
+| created_at | datetime | |
+| last_fetched_at | datetime NULL | 最終取得日時 |
+| last_fetch_ok | boolean NULL | 最終取得の成否。未取得は NULL |
+| last_fetch_error | text NULL | 最終取得の失敗理由 |
+
+**articles**（記事）
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| id | integer PK | |
+| feed_id | integer FK → feeds.id | フィード削除時は記事も削除（ON DELETE CASCADE） |
+| guid | text | 記事の同一性キー（5-3 参照） |
+| title | text | |
+| url | text NULL | 記事URL |
+| content | text NULL | フィードが提供する本文または要約 |
+| published_at | datetime NULL | 公開日時 |
+| fetched_at | datetime | 取得日時 |
+| is_read | boolean | 既読フラグ（既定 false） |
+| read_at | datetime NULL | 既読日時 |
+
+**summaries**（サマリ）
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| id | integer PK | |
+| period_start / period_end | datetime | 対象期間 |
+| created_at | datetime | 生成日時 |
+| body | text NULL | 本文。生成前・失敗時は NULL |
+| status | text | `pending` / `running` / `succeeded` / `failed` |
+
+**summary_articles**（サマリと元記事の関連。PK は `(summary_id, article_id)`）
+
+どちらの親が削除されても関連行のみ連鎖削除される。記事が保存期間で削除されてもサマリ本体は残る。
+
+**ai_jobs**（AIジョブ）
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| id | integer PK | |
+| kind | text | ジョブ種別（例: `summary`） |
+| status | text | `pending` / `running` / `succeeded` / `failed` |
+| input / result | JSON NULL | 入力・結果 |
+| error | text NULL | 失敗理由 |
+| created_at / started_at / finished_at | datetime | started_at・finished_at は NULL 可 |
+
+`status` は文字列で保持し、取りうる値はアプリ側で検証する（値の追加でマイグレーションを要さないため）。
+
+### 5-3. 記事の重複排除
+
+- `articles` に `UNIQUE (feed_id, guid)` を張り、同一フィード内の二重登録をDBで防ぐ。フィードをまたぐ同一記事は別記事として扱う。
+- `guid` はフィードが GUID を持てばその値、無ければ `make_guid()` でフォールバックする。
+  1. GUID（JSON Feed の `id`、Atom の `id`、RSS の `guid`）
+  2. 記事URLの SHA-256（`url:` 接頭辞）
+  3. タイトル+公開日時の SHA-256（`title:` 接頭辞）
+- 取り込み側は、既存記事と衝突した場合に無視（`INSERT ... ON CONFLICT DO NOTHING`）する。
+
+### 5-4. 索引
+
+| 索引 | 用途 |
+|---|---|
+| `articles(published_at)` | 新着順の一覧、保存期間による削除 |
+| `articles(feed_id, published_at)` | フィード別の一覧。`(feed_id, guid)` の一意索引はフィード単位の絞り込みにも効く |
+| `articles(is_read, published_at)` | 未読のみの一覧 |
+| `summary_articles(article_id)` | 記事からサマリへの逆引き |
+| `summaries(period_start)` | サマリ一覧 |
+| `ai_jobs(status, created_at)` | 未処理ジョブの取得 |
