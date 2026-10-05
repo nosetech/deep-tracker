@@ -67,6 +67,9 @@ class Feed(Base):
     # 最終取得の成否。未取得は NULL
     last_fetch_ok: Mapped[bool | None] = mapped_column(Boolean)
     last_fetch_error: Mapped[str | None] = mapped_column(Text)
+    # 条件付きGET用。次回取得時に If-None-Match / If-Modified-Since として送る
+    etag: Mapped[str | None] = mapped_column(String(512))
+    last_modified: Mapped[str | None] = mapped_column(String(128))
 
     articles: Mapped[list["Article"]] = relationship(
         back_populates="feed", cascade="all, delete-orphan", passive_deletes=True
