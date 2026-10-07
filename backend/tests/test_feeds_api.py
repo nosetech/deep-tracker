@@ -150,7 +150,14 @@ def test_update(client):
 
 
 @pytest.mark.parametrize(
-    "body", [{"name": ""}, {"name": None}, {"fetch_interval_minutes": 0}, {"enabled": "x"}]
+    "body",
+    [
+        {"name": ""},
+        {"name": "   "},
+        {"name": None},
+        {"fetch_interval_minutes": 0},
+        {"enabled": "x"},
+    ],
 )
 def test_update_rejects_invalid(client, body):
     feed_id = add(client).json()["id"]

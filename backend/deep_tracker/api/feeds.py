@@ -153,9 +153,10 @@ def update_feed(feed_id: int, body: FeedUpdate, session: SessionDep) -> FeedOut:
     feed = _get_feed(session, feed_id)
     sent = body.model_fields_set
     if "name" in sent:
-        if body.name is None:
+        name = (body.name or "").strip()
+        if not name:
             raise _error(422, "invalid_name", "名称を空にはできません")
-        feed.name = body.name.strip()
+        feed.name = name
     if "fetch_interval_minutes" in sent:
         feed.fetch_interval_minutes = body.fetch_interval_minutes
     if "enabled" in sent and body.enabled is not None:
