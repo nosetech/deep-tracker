@@ -3,13 +3,14 @@ import sys
 import uvicorn
 from fastapi import FastAPI
 
-from deep_tracker.api import config, feeds, health
+from deep_tracker.api import articles, config, feeds, health
 
 # フロントは Next.js の rewrites で /api/* を中継するため、ここでは /api 配下に公開する
 app = FastAPI(title="Deep Tracker")
 app.include_router(health.router, prefix="/api")
 app.include_router(config.router, prefix="/api")
 app.include_router(feeds.router, prefix="/api")
+app.include_router(articles.router, prefix="/api")
 
 
 def main() -> None:
