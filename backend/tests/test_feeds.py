@@ -117,7 +117,16 @@ def test_parse_json_feed():
     assert entries[1].guid.startswith("url:")
 
 
-@pytest.mark.parametrize("bad", [b"<rss><channel><item>", b"not a feed at all", b"{broken", b"{}"])
+@pytest.mark.parametrize(
+    "bad",
+    [
+        b"<rss><channel><item>",
+        b"not a feed at all",
+        b"{broken",
+        b"{}",
+        b"<html><body>hello</body></html>",
+    ],
+)
 def test_parse_broken_raises(bad):
     with pytest.raises(FeedParseError):
         parse_feed(bad)

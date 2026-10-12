@@ -29,12 +29,26 @@ def parse_feed(content: bytes) -> list[ParsedEntry]:
     return _parse_xml_feed(content)
 
 
+def parse_feed_title(content: bytes) -> str | None:
+    """フィード自体のタイトルを返す。無ければ None。"""
+    if content.lstrip()[:1] == b"{":
+        try:
+            data = json.loads(content)
+        except ValueError:
+            return None
+        title = data.get("title") if isinstance(data, dict) else None
+        return title.strip() or None if isinstance(title, str) else None
+    title = feedparser.parse(content).feed.get("title")
+    return title.strip() or None if title else None
+
+
 def _parse_xml_feed(content: bytes) -> list[ParsedEntry]:
     parsed = feedparser.parse(content)
     # タイトルもリンクも無い記事は解析失敗（壊れたXMLの残骸）とみなして除外する
     items = [e for e in parsed.entries if e.get("title") or e.get("link")]
-    # 壊れたXMLでも読めた記事は採用し、1件も取れず壊れている場合のみ失敗とする
-    if not items and (parsed.bozo or not parsed.feed):
+    # 壊れたXMLでも読めた記事は採用し、1件も取れず壊れている場合のみ失敗とする。
+    # HTML等は version（RSS/Atomの判定結果）が空になるので、フィードではないとみなす
+    if not items and (parsed.bozo or not parsed.version):
         reason = parsed.get("bozo_exception")
         raise FeedParseError(f"フィードを解析できません: {reason or '不明な形式'}")
 
