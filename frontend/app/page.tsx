@@ -1,7 +1,3 @@
-export default function Home() {
-  return (
-    <main>
-      <h1>Deep Tracker</h1>
-    </main>
-  );
+export default function SummaryPage() {
+  return <h1 className="page-title">サマリ</h1>;
 }
