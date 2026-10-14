@@ -23,6 +23,7 @@ from deep_tracker.config.loader import DEPLOY_ROOT
 from deep_tracker.db import Feed, create_db_engine, make_session_factory, upgrade_db
 from deep_tracker.db.models import utcnow
 from deep_tracker.feeds import fetch_and_store
+from deep_tracker.jobs.retention import purge_expired_articles
 
 logger = logging.getLogger("deep_tracker.jobs.fetch")
 
@@ -152,6 +153,7 @@ def main(argv: list[str] | None = None) -> int:
             try:
                 with make_session_factory(engine)() as session:
                     report = run_fetch(session, settings)
+                    purge_expired_articles(session, settings.retention.days)
             finally:
                 engine.dispose()
     except AlreadyRunningError:
