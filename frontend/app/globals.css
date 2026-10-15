@@ -394,3 +394,513 @@ a:hover {
     box-sizing: content-box;
   }
 }
+
+/* ---- 購読フィード画面 ---- */
+.feeds-page {
+  max-width: 1040px;
+}
+
+.feeds-title {
+  margin-bottom: 16px;
+}
+
+.feed-add {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.feed-add-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.feed-add-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.feed-add-input {
+  flex: 1 1 260px;
+  min-width: 0;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--line2);
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 14px;
+  font-family: var(--font-plex-mono), "IBM Plex Mono", monospace;
+  outline-color: var(--ac);
+}
+
+.btn-primary {
+  flex: 0 0 auto;
+  height: 38px;
+  padding: 0 18px;
+  border-radius: 8px;
+  border: 0;
+  background: var(--ac);
+  color: var(--onAc);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.feed-add-err {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--err);
+}
+
+.feed-add-err svg {
+  flex: none;
+  margin-top: 3px;
+}
+
+.feed-add-err span {
+  text-wrap: pretty;
+}
+
+.feed-add-hint {
+  font-size: 12px;
+  color: var(--tx3);
+  line-height: 1.6;
+}
+
+.feed-list-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 26px 0 8px;
+}
+
+.feed-list-head h2 {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.feed-list-head span {
+  font-size: 12.5px;
+  color: var(--tx3);
+}
+
+.feed-empty {
+  border: 1px dashed var(--line2);
+  border-radius: 10px;
+  padding: 32px 20px;
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--tx2);
+  margin-bottom: 12px;
+}
+
+.feed-list {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+}
+
+.feed-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  align-items: flex-start;
+  padding: 16px 2px;
+  border-bottom: 1px solid var(--line);
+}
+
+.feed-main {
+  flex: 1 1 280px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.feed-name {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.feed-url {
+  font-family: var(--font-plex-mono), "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--tx3);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.feed-error {
+  margin-top: 6px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--err);
+  overflow-wrap: anywhere;
+}
+
+.feed-status {
+  flex: 0 1 190px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12.5px;
+}
+
+.feed-status-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.feed-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.feed-sub {
+  color: var(--tx3);
+  font-variant-numeric: tabular-nums;
+}
+
+.feed-counts {
+  flex: 0 1 170px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12.5px;
+  color: var(--tx2);
+  font-variant-numeric: tabular-nums;
+}
+
+.feed-actions {
+  flex: 0 0 auto;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+.switch {
+  width: 40px;
+  height: 24px;
+  border-radius: 12px;
+  border: 0;
+  padding: 0;
+  position: relative;
+  cursor: pointer;
+  flex: none;
+}
+
+.switch-knob {
+  position: absolute;
+  top: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: left 0.15s;
+}
+
+.btn-outline {
+  border: 1px solid var(--line2);
+  border-radius: 7px;
+  background: var(--surface);
+  font-size: 12.5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-outline:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btn-sm {
+  height: 32px;
+  padding: 0 10px;
+}
+
+.btn-icon {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+}
+
+.feed-empty .btn-outline {
+  margin-top: 8px;
+  height: 32px;
+  padding: 0 12px;
+}
+
+.feed-menu {
+  position: absolute;
+  right: 0;
+  top: 38px;
+  z-index: 20;
+  min-width: 220px;
+  padding: 5px;
+  border: 1px solid var(--line2);
+  border-radius: 9px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+}
+
+.feed-menu button {
+  text-align: left;
+  border: 0;
+  background: none;
+  padding: 9px 10px;
+  border-radius: 6px;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.feed-menu button:hover {
+  background: var(--hover);
+}
+
+.feed-menu button.is-danger {
+  color: var(--err);
+}
+
+.feed-menu button.is-danger:hover {
+  background: var(--errSoft);
+}
+
+.feed-menu-sep {
+  height: 1px;
+  background: var(--line);
+  margin: 4px 0;
+}
+
+/* ---- モーダル ---- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(10, 12, 16, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+@media (max-width: 719px) {
+  .modal-backdrop {
+    align-items: flex-end;
+  }
+}
+
+.modal {
+  width: 100%;
+  max-width: 440px;
+  background: var(--surface);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.modal h2 {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.modal-text {
+  font-size: 14px;
+  line-height: 1.85;
+  color: var(--tx2);
+  text-wrap: pretty;
+}
+
+.modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modal-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.modal-form input,
+.modal-form select {
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line2);
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.modal-url {
+  font-size: 12px;
+  color: var(--tx3);
+  font-family: var(--font-plex-mono), "IBM Plex Mono", monospace;
+  overflow-wrap: anywhere;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.btn-cancel,
+.btn-ok {
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.btn-cancel {
+  border: 1px solid var(--line2);
+  background: transparent;
+}
+
+.btn-ok {
+  border: 0;
+  font-weight: 600;
+}
+
+.btn-ok:disabled,
+.btn-cancel:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* ---- トースト ---- */
+.toast-region {
+  position: fixed;
+  z-index: 40;
+  right: 24px;
+  bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+  pointer-events: none;
+}
+
+@media (max-width: 719px) {
+  .toast-region {
+    left: 12px;
+    right: 12px;
+    bottom: 76px;
+    align-items: stretch;
+  }
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 420px;
+  width: 100%;
+  padding: 11px 12px 11px 14px;
+  border-radius: 9px;
+  background: var(--toastBg);
+  color: var(--toastTx);
+  box-shadow: var(--shadow);
+  font-size: 13.5px;
+  line-height: 1.55;
+  animation: dtin 0.18s ease-out;
+}
+
+@keyframes dtin {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.toast-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.toast-dot-info {
+  background: var(--toastTx);
+}
+
+.toast-dot-success {
+  background: var(--ok);
+}
+
+.toast-dot-error {
+  background: var(--err);
+}
+
+.toast-text {
+  flex: 1;
+  min-width: 0;
+  text-wrap: pretty;
+}
+
+.toast-action {
+  flex: none;
+  border: 0;
+  background: none;
+  color: var(--toastAc);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+
+.toast-close {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  background: none;
+  color: var(--toastTx);
+  opacity: 0.6;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}

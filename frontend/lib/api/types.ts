@@ -24,3 +24,13 @@ export type UnreadCounts = {
   total: number;
   feeds: FeedUnreadCount[];
 };
+
+export type FetchResult = {
+  added: number;
+  feed: Feed;
+};
+
+export type BulkReadResult = {
+  count: number;
+  article_ids: number[];
+};
