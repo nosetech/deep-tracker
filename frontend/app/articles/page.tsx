@@ -8,6 +8,7 @@ import { api } from "@/lib/api/client";
 import type { ArticleListItem, Feed } from "@/lib/api/types";
 
 const PER_PAGE = 20;
+const MORE_PER_PAGE = 100;
 
 type Period = "all" | "1" | "3" | "7" | "30";
 
@@ -119,6 +120,10 @@ export default function ArticlesPage() {
   const load = useCallback(async () => {
     const gen = ++generation.current;
     const query = buildQuery(filter);
+    setItems([]);
+    setTotal(0);
+    setLoaded(false);
+    setLoadError(false);
     try {
       const [list, unread] = await Promise.all([
         api.listArticles({ ...query, per_page: PER_PAGE }),
@@ -160,13 +165,14 @@ export default function ArticlesPage() {
     // 既読で外した分を除いた件数を、サーバー側の取得済み位置とみなす
     const gen = generation.current;
     const matched = filter.unreadOnly ? visible.length : items.length;
-    const page = Math.floor(matched / PER_PAGE) + 1;
+    // 既読で位置がずれても取りこぼさないよう、大きめの窓で取得して重複を除く
+    const page = Math.floor(matched / MORE_PER_PAGE) + 1;
     setLoadingMore(true);
     try {
       const list = await api.listArticles({
         ...buildQuery(filter),
         page,
-        per_page: PER_PAGE,
+        per_page: MORE_PER_PAGE,
       });
       if (gen !== generation.current) return;
       setItems((cur) => {
@@ -213,7 +219,7 @@ export default function ArticlesPage() {
   };
 
   const open = async (a: ArticleListItem) => {
-    if (!a.is_read) await setOne(a, true);
+    if (!a.is_read) void setOne(a, true);
     router.push(`/articles/${a.id}`);
   };
 
@@ -262,7 +268,13 @@ export default function ArticlesPage() {
     label: string;
     onClick: () => void;
   } | null = null;
-  if (loaded && !loadError && visible.length === 0 && feeds !== null) {
+  if (
+    loaded &&
+    !loadError &&
+    visible.length === 0 &&
+    !hasMore &&
+    feeds !== null
+  ) {
     if (noFeeds)
       empty = {
         title: "フィードが登録されていません",
@@ -346,10 +358,11 @@ export default function ArticlesPage() {
                 aria-label="キーワード検索"
               />
             </div>
-            <div className="art-seg" role="tablist" aria-label="表示切り替え">
+            <div className="art-seg" aria-label="表示切り替え">
               <button
                 type="button"
                 className={filter.unreadOnly ? "is-on" : ""}
+                aria-pressed={filter.unreadOnly}
                 onClick={() => setFilter((f) => ({ ...f, unreadOnly: true }))}
               >
                 未読のみ（{unreadTotal}）
@@ -357,6 +370,7 @@ export default function ArticlesPage() {
               <button
                 type="button"
                 className={filter.unreadOnly ? "" : "is-on"}
+                aria-pressed={!filter.unreadOnly}
                 onClick={() => setFilter((f) => ({ ...f, unreadOnly: false }))}
               >
                 すべて
