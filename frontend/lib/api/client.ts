@@ -1,4 +1,12 @@
-import type { BulkReadResult, Feed, FetchResult, UnreadCounts } from "./types";
+import type {
+  ArticleList,
+  ArticleQuery,
+  BulkReadResult,
+  Feed,
+  FetchResult,
+  ReadState,
+  UnreadCounts,
+} from "./types";
 
 // ブラウザは常に Next.js 経由（/api/* → backend へ中継）でアクセスする
 export class ApiError extends Error {
@@ -61,6 +69,18 @@ export const api = {
     request<BulkReadResult>("/articles/mark-unread", {
       method: "POST",
       body: JSON.stringify({ article_ids: articleIds }),
+    }),
+  listArticles: (query: ArticleQuery) => {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(query)) {
+      if (v !== undefined && v !== "") params.set(k, String(v));
+    }
+    return request<ArticleList>(`/articles?${params}`);
+  },
+  setArticleRead: (id: number, isRead: boolean) =>
+    request<ReadState>(`/articles/${id}/read`, {
+      method: "PATCH",
+      body: JSON.stringify({ is_read: isRead }),
     }),
   getUnreadCounts: () => request<UnreadCounts>("/articles/unread-counts"),
 };

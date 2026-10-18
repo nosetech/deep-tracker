@@ -34,3 +34,36 @@ export type BulkReadResult = {
   count: number;
   article_ids: number[];
 };
+
+export type ArticleListItem = {
+  id: number;
+  feed_id: number;
+  feed_name: string;
+  title: string;
+  url: string | null;
+  excerpt: string | null;
+  published_at: string | null;
+  is_read: boolean;
+};
+
+export type ArticleList = {
+  items: ArticleListItem[];
+  total: number;
+  page: number;
+  per_page: number;
+};
+
+export type ReadState = {
+  id: number;
+  is_read: boolean;
+  read_at: string | null;
+};
+
+export type ArticleQuery = {
+  unread_only?: boolean;
+  feed_id?: number;
+  since?: string;
+  q?: string;
+  page?: number;
+  per_page?: number;
+};
