@@ -1,4 +1,5 @@
 import type {
+  ArticleDetail,
   ArticleList,
   ArticleQuery,
   BulkReadResult,
@@ -77,6 +78,7 @@ export const api = {
     }
     return request<ArticleList>(`/articles?${params}`);
   },
+  getArticle: (id: number) => request<ArticleDetail>(`/articles/${id}`),
   setArticleRead: (id: number, isRead: boolean) =>
     request<ReadState>(`/articles/${id}/read`, {
       method: "PATCH",
