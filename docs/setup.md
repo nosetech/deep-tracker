@@ -1,4 +1,31 @@
-# セットアップ手順（定期取得バッチ）
+# セットアップ手順
+
+## A. 画面の起動とLAN公開
+
+frontend の待ち受けは `config/config.yaml` の `frontend.host` / `frontend.port` で決まる。
+バックエンドは常に `127.0.0.1` で待ち受け、LAN公開の対象にならない（ブラウザは frontend の `/api/*` 中継経由でアクセスする）。
+
+```bash
+cd backend && uv sync && cd ..
+(cd frontend && npm install && env -u NODE_ENV npm run build)
+scripts/frontend.sh start      # 開発時は scripts/frontend.sh dev
+```
+
+| 設定 | 動作 |
+|---|---|
+| `frontend.host: 127.0.0.1`（既定） | このマシンからのみ閲覧できる |
+| `frontend.host: 0.0.0.0` | 同じネットワーク内の別デバイスから `http://<このマシンのIP>:<frontend.port>` で閲覧できる |
+
+LAN公開する手順:
+
+1. `config/config.yaml` の `frontend.host` を `0.0.0.0` にする
+2. `scripts/frontend.sh` を再起動する（設定はホットリロードされない）
+3. 別デバイスのブラウザから `http://<このマシンのIP>:3700` を開く。開けない場合は macOS のファイアウォール設定を確認する
+
+> **リスク**: 本アプリに認証はない。`0.0.0.0` にすると、同じネットワークに接続できる全員が購読フィードの閲覧・追加・削除、既読操作などを行える。
+> 自宅などの信頼できるネットワーク内に限り、外出時は VPN 経由でアクセスすること。インターネットへ直接公開（ポート開放など）してはならない。
+
+# 定期取得バッチ
 
 購読フィードを launchd で定期的に自動取得する手順。対象は macOS（per-user LaunchAgent）。
 
