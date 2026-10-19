@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SHELL_REFRESH_EVENT } from "@/components/AppShell";
 import { useToast } from "@/components/Toast";
+import { ApiErrorPanel, LoadingSkeleton } from "@/components/states";
 import { api } from "@/lib/api/client";
 import type { ArticleListItem, Feed } from "@/lib/api/types";
 
@@ -318,21 +319,9 @@ export default function ArticlesPage() {
     <div className="articles-page">
       <h1 className="page-title articles-title">記事一覧</h1>
 
-      {loadError && (
-        <div className="art-empty">
-          <div className="art-empty-title">記事を取得できませんでした</div>
-          <p>
-            バックエンドに接続できません。しばらくしてからもう一度お試しください。
-          </p>
-          <button
-            type="button"
-            className="art-empty-btn"
-            onClick={() => void load()}
-          >
-            再読み込み
-          </button>
-        </div>
-      )}
+      {loadError && <ApiErrorPanel onRetry={() => void load()} />}
+
+      {!loaded && <LoadingSkeleton list />}
 
       {hasFeeds && !loadError && (
         <div className="art-filter">

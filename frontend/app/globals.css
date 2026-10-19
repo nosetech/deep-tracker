@@ -1481,3 +1481,156 @@ a:hover {
     font-size: 16px;
   }
 }
+
+/* 読み込み中（スケルトン） */
+.skel {
+  max-width: 860px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.skel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--tx3);
+  font-size: 13px;
+}
+
+.skel-spin {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border-radius: 50%;
+  border: 2px solid var(--line2);
+  border-top-color: var(--ac);
+  animation: dtspin 0.8s linear infinite;
+  display: inline-block;
+}
+
+@keyframes dtspin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.skel-bar {
+  border-radius: 4px;
+  background: var(--surface2);
+}
+
+.skel-title {
+  height: 26px;
+  width: 55%;
+  border-radius: 6px;
+}
+
+.skel-sub {
+  height: 14px;
+  width: 30%;
+}
+
+.skel-rule {
+  height: 1px;
+  background: var(--line);
+  margin: 8px 0;
+}
+
+.skel-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 6px 0 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.skel-row-title {
+  height: 16px;
+}
+
+.skel-row-meta {
+  height: 12px;
+  width: 22%;
+}
+
+.skel-row-body {
+  height: 12px;
+  width: 92%;
+}
+
+/* エラーパネル */
+.err-panel {
+  max-width: 720px;
+  border: 1px solid var(--errLine);
+  background: var(--errSoft);
+  border-radius: 10px;
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.err-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--err);
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.err-panel p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.85;
+  color: var(--tx);
+  text-wrap: pretty;
+  overflow-wrap: anywhere;
+}
+
+.err-panel-detail {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--tx2);
+  overflow-wrap: anywhere;
+}
+
+.err-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.err-panel-retry {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 7px;
+  border: 0;
+  background: var(--tx);
+  color: var(--bg);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.err-panel-retry:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.err-panel-compact {
+  padding: 16px 18px;
+  gap: 8px;
+}
+
+.err-panel-compact .err-panel-title {
+  font-size: 14px;
+}
+
+.err-panel-compact .err-panel-retry {
+  height: 34px;
+  padding: 0 14px;
+}

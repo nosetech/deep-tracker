@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SHELL_REFRESH_EVENT } from "@/components/AppShell";
 import { useToast } from "@/components/Toast";
+import { ApiErrorPanel, LoadingSkeleton } from "@/components/states";
 import { ApiError, api } from "@/lib/api/client";
 import type { Feed } from "@/lib/api/types";
 
@@ -285,19 +286,9 @@ export default function FeedsPage() {
         )}
       </div>
 
-      {loadError && (
-        <div className="feed-empty" role="alert">
-          フィードを取得できませんでした。APIサーバーへの接続を確認してください。
-          <br />
-          <button
-            type="button"
-            className="btn-outline"
-            onClick={() => void load()}
-          >
-            再読み込み
-          </button>
-        </div>
-      )}
+      {loadError && <ApiErrorPanel onRetry={() => void load()} />}
+
+      {!feeds && !loadError && <LoadingSkeleton list />}
 
       {feeds && feeds.length === 0 && (
         <div className="feed-empty">

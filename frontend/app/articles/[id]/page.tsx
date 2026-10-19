@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { SHELL_REFRESH_EVENT } from "@/components/AppShell";
 import { useToast } from "@/components/Toast";
+import { ApiErrorPanel, LoadingSkeleton } from "@/components/states";
 import { api } from "@/lib/api/client";
 import { sanitizeHtml } from "@/lib/sanitize";
 import type { ArticleDetail } from "@/lib/api/types";
@@ -27,6 +28,7 @@ export default function ArticleDetailPage() {
   const params = useParams<{ id: string }>();
   const id = Number(params.id);
   const [article, setArticle] = useState<ArticleDetail | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [error, setError] = useState<"notfound" | "failed" | null>(null);
 
   useEffect(() => {
@@ -67,7 +69,7 @@ export default function ArticleDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, reloadKey]);
 
   const content = article?.content;
   const html = useMemo(() => (content ? sanitizeHtml(content) : ""), [content]);
@@ -91,20 +93,19 @@ export default function ArticleDetailPage() {
     toast(next ? "既読にしました" : "未読に戻しました");
   };
 
+  if (error === "failed") {
+    return (
+      <div className="art-detail">
+        <ApiErrorPanel onRetry={() => setReloadKey((k) => k + 1)} />
+      </div>
+    );
+  }
   if (error) {
     return (
       <div className="art-detail">
         <div className="art-empty">
-          <div className="art-empty-title">
-            {error === "notfound"
-              ? "記事が見つかりません"
-              : "記事を取得できませんでした"}
-          </div>
-          <p>
-            {error === "notfound"
-              ? "削除されたか、存在しない記事です。"
-              : "バックエンドに接続できません。しばらくしてからもう一度お試しください。"}
-          </p>
+          <div className="art-empty-title">記事が見つかりません</div>
+          <p>削除されたか、存在しない記事です。</p>
           <button
             type="button"
             className="art-empty-btn"
@@ -116,7 +117,12 @@ export default function ArticleDetailPage() {
       </div>
     );
   }
-  if (!article) return <div className="art-detail" aria-busy="true" />;
+  if (!article)
+    return (
+      <div className="art-detail">
+        <LoadingSkeleton />
+      </div>
+    );
 
   const when = article.published_at ?? article.fetched_at;
 
