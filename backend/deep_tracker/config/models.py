@@ -49,6 +49,16 @@ class SlackSettings(_Section):
         return self
 
 
+class AIProviderName(StrEnum):
+    CLAUDE_CODE = "claude_code"
+
+
+class AISettings(_Section):
+    provider: AIProviderName = AIProviderName.CLAUDE_CODE
+    model: str | None = None  # 未指定ならCLIの既定
+    timeout_seconds: float = Field(300, gt=0)
+
+
 class FeedSettings(_Section):
     fetch_interval_minutes: int = Field(60, ge=1)
 
@@ -62,6 +72,7 @@ class Settings(_Section):
     summary: SummarySettings = SummarySettings()
     slack: SlackSettings = SlackSettings()
     feed: FeedSettings = FeedSettings()
+    ai: AISettings = AISettings()
 
     @property
     def lan_exposed(self) -> bool:
