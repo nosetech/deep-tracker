@@ -1,13 +1,43 @@
 import sys
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 import uvicorn
 from fastapi import FastAPI
 
-from deep_tracker.api import articles, config, feeds, health
+from deep_tracker.api import ai_jobs, articles, config, feeds, health
+from deep_tracker.api.deps import _session_factory
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    from deep_tracker.ai import create_provider
+    from deep_tracker.config import get_settings
+    from deep_tracker.jobs.ai_jobs import AIJobRunner, recover_interrupted_jobs
+
+    settings = get_settings()
+    factory = _session_factory()
+    # 前回の終了時に実行中だったジョブは再開できないため、失敗として整理する
+    with factory() as session:
+        recover_interrupted_jobs(session)
+    # ジョブ種別ごとのハンドラは、各機能（サマリ生成など）の実装時に登録する
+    runner = AIJobRunner(
+        factory,
+        create_provider(settings.ai),
+        handlers={},
+        concurrency=settings.ai.max_concurrent_jobs,
+    )
+    runner.start()
+    try:
+        yield
+    finally:
+        runner.stop()
+
 
 # フロントは Next.js の rewrites で /api/* を中継するため、ここでは /api 配下に公開する
-app = FastAPI(title="Deep Tracker")
+app = FastAPI(title="Deep Tracker", lifespan=lifespan)
 app.include_router(health.router, prefix="/api")
+app.include_router(ai_jobs.router, prefix="/api")
 app.include_router(config.router, prefix="/api")
 app.include_router(feeds.router, prefix="/api")
 app.include_router(articles.router, prefix="/api")

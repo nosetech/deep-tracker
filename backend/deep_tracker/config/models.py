@@ -57,6 +57,8 @@ class AISettings(_Section):
     provider: AIProviderName = AIProviderName.CLAUDE_CODE
     model: str | None = None  # 未指定ならCLIの既定
     timeout_seconds: float = Field(300, gt=0)
+    # AIジョブの同時実行数。サブスクリプションの制限を踏まえ、既定は逐次（1）
+    max_concurrent_jobs: int = Field(1, ge=1)
 
 
 class FeedSettings(_Section):
