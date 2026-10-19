@@ -32,8 +32,11 @@ include = ["deep_tracker*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = ["network: 実URLへ接続するテスト（通常は除外。`pytest -m network` で実行）"]
-addopts = "-m 'not network'"
+markers = [
+    "network: 実URLへ接続するテスト（通常は除外。`pytest -m network` で実行）",
+    "cli: 実際の claude CLI を呼ぶテスト（通常は除外。`pytest -m cli` で実行）",
+]
+addopts = "-m 'not network and not cli'"
 
 [tool.ruff]
 line-length = 100
