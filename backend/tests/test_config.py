@@ -109,3 +109,20 @@ def test_config_api_hides_secrets(monkeypatch, tmp_path):
     assert body["slack_enabled"] is True
     assert body["retention_days"] == 365
     assert "hooks.slack.com" not in str(body)
+
+
+def test_launch_settings_output(monkeypatch, tmp_path, capsys):
+    from deep_tracker.config import __main__ as launch
+
+    path = write(tmp_path, "frontend:\n  host: 0.0.0.0\n  port: 3710\nbackend:\n  port: 8710\n")
+    monkeypatch.setenv(loader.CONFIG_ENV, str(path))
+    loader.get_settings.cache_clear()
+    try:
+        assert launch.main() == 0
+    finally:
+        loader.get_settings.cache_clear()
+    assert capsys.readouterr().out.splitlines() == [
+        "FRONTEND_HOST=0.0.0.0",
+        "FRONTEND_PORT=3710",
+        "BACKEND_PORT=8710",
+    ]

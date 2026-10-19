@@ -28,6 +28,7 @@ cd frontend && npm run dev
 ```
 
 動作確認: `curl http://localhost:3700/api/health` が `{"status":"ok"}` を返せば、frontend から backend への中継まで通っている。
+設定ファイルの待ち受けホスト・ポートで frontend を起動するには `scripts/frontend.sh dev`（LAN公開の手順とリスクは `docs/setup.md`）。
 バックエンドの接続先を変える場合は、frontend の環境変数 `BACKEND_URL`（既定 `http://127.0.0.1:8700`）を指定する。
 
 > `NODE_ENV` を `development` 以外にしたシェルで `npm run build` を行うと失敗することがある場合は、`env -u NODE_ENV npm run build` で実行する。
