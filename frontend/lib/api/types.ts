@@ -46,6 +46,26 @@ export type ArticleListItem = {
   is_read: boolean;
 };
 
+export type ArticleNeighbor = {
+  id: number;
+  title: string;
+};
+
+export type ArticleDetail = {
+  id: number;
+  feed_id: number;
+  feed_name: string;
+  title: string;
+  url: string | null;
+  content: string | null;
+  published_at: string | null;
+  fetched_at: string;
+  is_read: boolean;
+  read_at: string | null;
+  newer: ArticleNeighbor | null;
+  older: ArticleNeighbor | null;
+};
+
 export type ArticleList = {
   items: ArticleListItem[];
   total: number;
