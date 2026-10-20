@@ -140,6 +140,8 @@ config/
 | body | text NULL | 本文。生成前・失敗時は NULL |
 | status | text | `pending` / `running` / `succeeded` / `failed` |
 
+`body` には `{"overview": 総評, "topics": [{"title", "summary", "article_ids"}]}` のJSONを保存する（トピックごとの元記事は `article_ids`）。対象期間に記事が0件の場合はサマリを生成しない。AIの出力が不正な場合は `status=failed` で記録する。プロンプトは `backend/deep_tracker/summary/prompts/summary.md`。
+
 **summary_articles**（サマリと元記事の関連。PK は `(summary_id, article_id)`）
 
 どちらの親が削除されても関連行のみ連鎖削除される。記事が保存期間で削除されてもサマリ本体は残る（関連行のみ消え、サマリ上の元記事リンクは無効として扱う）。保存期間の起点は取得日時（`fetched_at`）。公開日時だと、フィードに残る古い記事が削除後に再取得されて未読として復活するため。削除は定期取得バッチの末尾で実行し、削除件数をログに出す。
