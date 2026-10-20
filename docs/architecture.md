@@ -157,6 +157,13 @@ config/
 
 `status` は文字列で保持し、取りうる値はアプリ側で検証する（値の追加でマイグレーションを要さないため）。
 
+ジョブの実行管理（`deep_tracker/jobs/ai_jobs.py`）:
+
+- バックエンド起動時にワーカーを `ai.max_concurrent_jobs`（既定1＝逐次）本起動し、`pending` を作成順に処理する。取得は `UPDATE ... WHERE status='pending'` で行い、二重実行しない。
+- 失敗時は `error` に理由を保存し、自動リトライはしない。利用制限エラーは `error` が「利用制限に達しました」で始まり、API の `rate_limited` が true になる（GUIは再試行を促す）。
+- 起動時に `running` のまま残ったジョブは `failed`（再起動により中断）として整理する。
+- 状態取得API: `GET /api/ai-jobs`（`status` / `kind` / `limit`）、`GET /api/ai-jobs/{id}`。
+
 ### 5-3. 記事の重複排除
 
 - `articles` に `UNIQUE (feed_id, guid)` を張り、同一フィード内の二重登録をDBで防ぐ。フィードをまたぐ同一記事は別記事として扱う。
