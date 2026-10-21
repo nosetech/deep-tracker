@@ -84,3 +84,40 @@ DBを分けていれば互いに干渉しない。
 ```bash
 tail -f logs/fetch.log
 ```
+
+# サマリの定期実行
+
+サマリを launchd で定期的に自動生成する手順。前提は「定期取得バッチ」と同じ（`config/config.yaml` を用意済みであること）。
+
+## 1. 周期の設定
+
+`config/config.yaml` の `summary.interval` で決める。既定は `weekly`。
+
+| 値 | 生成される期間（ローカル時刻） |
+|---|---|
+| `daily` | 前日 0:00〜当日 0:00 |
+| `weekly`（既定） | 前週の月曜 0:00〜今週の月曜 0:00 |
+| `monthly` | 前月 1日 0:00〜今月 1日 0:00 |
+
+変更後は次回のバッチ起動から反映される（バッチは毎回設定を読み直す）。
+
+## 2. 登録
+
+```bash
+scripts/summary-job.sh install
+```
+
+- ジョブ名は `com.nosetech.deep-tracker.<instance>.summary`（instance ごとに別ジョブ）
+- launchd は既定で3600秒ごとに起動する（`SUMMARY_TICK_SECONDS=1800 scripts/summary-job.sh install` で変更可）。
+  期間が終わった後の最初の起動で生成される。生成済みの期間は何もしない
+- 操作（`uninstall` / `start` / `stop` / `status` / `run`）は `scripts/fetch-job.sh` と同じ
+
+## 3. 動作
+
+- 同じ期間のサマリが既にある場合（失敗・実行中を含む）は二重に生成しない
+- 対象期間に記事が無い場合は生成しない
+- 利用制限などでAI処理が失敗した場合は、`status=failed` のサマリを記録して終了する。自動リトライはせず、次の期間まで待つ
+- 成功・失敗はSlack通知される（`slack.enabled: true` の場合）
+- 多重起動は `<db.path の親>/summary.lock` で防ぐ
+
+ログは `logs/summary.log`（1MBで5世代ローテーション）。launchd が受け取った出力は `logs/summary.launchd.log`。
