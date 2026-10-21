@@ -5,7 +5,11 @@ import type {
   BulkReadResult,
   Feed,
   FetchResult,
+  GenerationState,
   ReadState,
+  SummaryConfig,
+  SummaryDetail,
+  SummaryListItem,
   UnreadCounts,
 } from "./types";
 
@@ -85,4 +89,14 @@ export const api = {
       body: JSON.stringify({ is_read: isRead }),
     }),
   getUnreadCounts: () => request<UnreadCounts>("/articles/unread-counts"),
+  listSummaries: () => request<SummaryListItem[]>("/summaries"),
+  getSummary: (id: number) => request<SummaryDetail>(`/summaries/${id}`),
+  getLatestSummary: () => request<SummaryDetail>("/summaries/latest"),
+  getSummaryConfig: () => request<SummaryConfig>("/summaries/config"),
+  getGeneration: (dismissed?: number | null) =>
+    request<GenerationState>(
+      `/summaries/generation${dismissed ? `?dismissed=${dismissed}` : ""}`,
+    ),
+  generateSummary: () =>
+    request<GenerationState>("/summaries/generate", { method: "POST" }),
 };
