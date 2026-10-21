@@ -97,14 +97,14 @@ def lock_path_for(settings: Settings) -> Path:
     return Path(settings.db.path).with_name("fetch.lock")
 
 
-def configure_logging(log_dir: Path = LOG_DIR) -> None:
-    """標準出力とローテーション付きファイル（fetch.log）へ出力する。"""
+def configure_logging(log_dir: Path = LOG_DIR, filename: str = "fetch.log") -> None:
+    """標準出力とローテーション付きファイル（既定は fetch.log）へ出力する。"""
     log_dir.mkdir(parents=True, exist_ok=True)
     fmt = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
     handlers: list[logging.Handler] = [
         logging.StreamHandler(sys.stdout),
         RotatingFileHandler(
-            log_dir / "fetch.log",
+            log_dir / filename,
             maxBytes=LOG_MAX_BYTES,
             backupCount=LOG_BACKUP_COUNT,
             encoding="utf-8",
