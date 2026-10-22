@@ -87,3 +87,50 @@ export type ArticleQuery = {
   page?: number;
   per_page?: number;
 };
+
+export type SummaryListItem = {
+  id: number;
+  kind: string;
+  period_start: string;
+  period_end: string;
+  created_at: string;
+  article_count: number;
+  topic_count: number;
+};
+
+export type SummarySource = {
+  id: number;
+  title: string;
+  url: string | null;
+  feed_name: string;
+  published_at: string | null;
+  is_read: boolean;
+};
+
+export type SummaryTopic = {
+  title: string;
+  summary: string;
+  sources: SummarySource[];
+};
+
+export type SummaryDetail = SummaryListItem & {
+  overview: string;
+  topics: SummaryTopic[];
+  new_since: { count: number; unread_count: number };
+  is_latest: boolean;
+};
+
+export type GenerationState = {
+  state: "idle" | "running" | "failed";
+  job_id: number | null;
+  step: number;
+  period_start: string | null;
+  article_count: number | null;
+  error: string | null;
+  rate_limited: boolean;
+  reset_text: string | null;
+};
+
+export type SummaryConfig = {
+  interval: "daily" | "weekly" | "monthly";
+};

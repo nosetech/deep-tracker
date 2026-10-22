@@ -40,7 +40,7 @@ export function ErrorPanel({
   children,
 }: {
   title: string;
-  message: string;
+  message: ReactNode;
   detail?: string;
   onRetry?: () => void;
   retryLabel?: string;

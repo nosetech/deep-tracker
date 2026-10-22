@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI
 
-from deep_tracker.api import ai_jobs, articles, config, feeds, health
+from deep_tracker.api import ai_jobs, articles, config, feeds, health, summaries
 from deep_tracker.api.deps import _session_factory
 
 
@@ -14,20 +14,21 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     from deep_tracker.ai import create_provider
     from deep_tracker.config import get_settings
     from deep_tracker.jobs.ai_jobs import AIJobRunner, recover_interrupted_jobs
+    from deep_tracker.summary.service import JOB_KIND, make_summary_handler
 
     settings = get_settings()
     factory = _session_factory()
     # 前回の終了時に実行中だったジョブは再開できないため、失敗として整理する
     with factory() as session:
         recover_interrupted_jobs(session)
-    # ジョブ種別ごとのハンドラは、各機能（サマリ生成など）の実装時に登録する
     runner = AIJobRunner(
         factory,
         create_provider(settings.ai),
-        handlers={},
+        handlers={JOB_KIND: make_summary_handler(factory)},
         concurrency=settings.ai.max_concurrent_jobs,
     )
     runner.start()
+    _app.state.ai_runner = runner
     try:
         yield
     finally:
@@ -41,6 +42,7 @@ app.include_router(ai_jobs.router, prefix="/api")
 app.include_router(config.router, prefix="/api")
 app.include_router(feeds.router, prefix="/api")
 app.include_router(articles.router, prefix="/api")
+app.include_router(summaries.router, prefix="/api")
 
 
 def main() -> None:

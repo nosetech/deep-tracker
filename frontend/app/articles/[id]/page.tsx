@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { SHELL_REFRESH_EVENT } from "@/components/AppShell";
 import { useToast } from "@/components/Toast";
@@ -74,9 +74,13 @@ export default function ArticleDetailPage() {
   const content = article?.content;
   const html = useMemo(() => (content ? sanitizeHtml(content) : ""), [content]);
 
+  // サマリの元記事から開いた場合は、戻り先をサマリにする
+  const fromSummary = useSearchParams().get("from") === "summary";
+  const backLabel = fromSummary ? "サマリに戻る" : "記事一覧に戻る";
+
   const goBack = () => {
     if (window.history.length > 1) router.back();
-    else router.push("/articles");
+    else router.push(fromSummary ? "/" : "/articles");
   };
 
   const toggle = async () => {
@@ -142,7 +146,7 @@ export default function ArticleDetailPage() {
         >
           <path d="M15 18l-6-6 6-6" />
         </svg>
-        記事一覧に戻る
+        {backLabel}
       </button>
       <div className="det-meta">
         <span className="det-feed">{article.feed_name}</span>
