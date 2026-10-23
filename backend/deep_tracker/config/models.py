@@ -41,6 +41,10 @@ class SummarySettings(_Section):
 class SlackSettings(_Section):
     enabled: bool = False
     webhook_url: HttpUrl | None = None
+    # サマリ生成の失敗も通知するか
+    notify_on_failure: bool = True
+    # 通知に含めるGUIリンクのベースURL。未指定なら frontend.host / port から組み立てる
+    base_url: HttpUrl | None = None
 
     @model_validator(mode="after")
     def _require_webhook_url(self) -> "SlackSettings":

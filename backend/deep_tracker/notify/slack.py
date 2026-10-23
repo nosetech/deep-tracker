@@ -20,6 +20,8 @@ RETRY_WAIT_SECONDS = 1.0
 
 
 def gui_url(settings: Settings, path: str = "/") -> str:
+    if settings.slack.base_url is not None:
+        return f"{str(settings.slack.base_url).rstrip('/')}{path}"
     host = settings.frontend.host
     if host == "0.0.0.0":  # noqa: S104  待ち受け用アドレスはリンクに使えない
         host = "localhost"

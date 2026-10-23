@@ -117,7 +117,8 @@ scripts/summary-job.sh install
 - 同じ期間のサマリが既にある場合（失敗・実行中を含む）は二重に生成しない
 - 対象期間に記事が無い場合は生成しない
 - 利用制限などでAI処理が失敗した場合は、`status=failed` のサマリを記録して終了する。自動リトライはせず、次の期間まで待つ
-- 成功・失敗はSlack通知される（`slack.enabled: true` の場合）
+- 成功時は期間・トピック見出し・GUIへのリンクがSlack通知される（`slack.enabled: true` の場合）。失敗も通知されるが、`slack.notify_on_failure: false` で止められる
+- 通知内のリンクは `slack.base_url` があればそれを、なければ `frontend.host` / `frontend.port` を使う（LAN公開時は `base_url` にLANのアドレスを指定する）
 - 多重起動は `<db.path の親>/summary.lock` で防ぐ
 
 ログは `logs/summary.log`（1MBで5世代ローテーション）。launchd が受け取った出力は `logs/summary.launchd.log`。

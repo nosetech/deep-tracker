@@ -39,9 +39,11 @@ class MockProvider(AIProvider):
 class FakeNotifier:
     def __init__(self):
         self.sent = []
+        self.bodies = []
 
     def notify(self, title, body=None, path=None):
         self.sent.append(title)
+        self.bodies.append(body)
         return True
 
 
@@ -119,3 +121,22 @@ def test_failure_is_recorded_and_not_retried(env):
     # 同じ期間では再実行しない
     assert run_scheduled_summary(session, provider, settings, now=NOW, notifier=notifier) is None
     assert provider.calls == 1
+
+
+def test_success_notification_lists_topics(env):
+    session, settings = env
+    notifier = FakeNotifier()
+    run_scheduled_summary(session, MockProvider(), settings, now=NOW, notifier=notifier)
+    assert "• t" in notifier.bodies[0]
+
+
+def test_failure_notification_can_be_disabled(env, tmp_path):
+    session, _ = env
+    cfg = tmp_path / "off.yaml"
+    cfg.write_text("slack: {notify_on_failure: false}\n", encoding="utf-8")
+    notifier = FakeNotifier()
+    with pytest.raises(AIError):
+        run_scheduled_summary(
+            session, MockProvider(fail=True), load_settings(cfg), now=NOW, notifier=notifier
+        )
+    assert notifier.sent == []
