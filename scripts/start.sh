@@ -5,7 +5,7 @@
 # 環境変数: FRONTEND_MODE  start（既定。未ビルドなら build する）| dev
 #
 # 待ち受けは config.yaml の frontend.host / frontend.port / backend.port に従う。
-# 停止は scripts/stop.sh。フォアグラウンドで frontend だけ起動する場合は scripts/frontend.sh。
+# 停止は scripts/stop.sh。
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 load_config
@@ -40,9 +40,14 @@ fi
 (cd "$DEPLOY_ROOT/backend" && nohup uv run python -m deep_tracker.main \
     >>"$LOG_DIR/backend.log" 2>&1 & echo $! >"$(pid_file backend)")
 
-# ホスト/ポート/BACKEND_URL の解決と LAN公開の警告は frontend.sh に任せる
-(nohup "$DEPLOY_ROOT/scripts/frontend.sh" "$MODE" \
-    >>"$LOG_DIR/frontend.log" 2>&1 & echo $! >"$(pid_file frontend)")
+if [[ "$FRONTEND_HOST" == "0.0.0.0" ]]; then
+    echo "警告: LAN公開で起動します（認証なし）。信頼できるネットワーク/VPN内でのみ使ってください" >&2
+fi
+
+# BACKEND_URL は /api/* の中継先。backend は常に 127.0.0.1
+(cd "$DEPLOY_ROOT/frontend" &&
+    FRONTEND_HOST="$FRONTEND_HOST" FRONTEND_PORT="$FRONTEND_PORT" BACKEND_URL="$BACKEND_URL" \
+        nohup npm run "$MODE" >>"$LOG_DIR/frontend.log" 2>&1 & echo $! >"$(pid_file frontend)")
 
 echo "起動しました: backend http://127.0.0.1:$BACKEND_PORT / frontend http://$FRONTEND_HOST:$FRONTEND_PORT"
 echo "ログ: $LOG_DIR/{backend,frontend}.log"
