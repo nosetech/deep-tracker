@@ -53,11 +53,24 @@ def summary_period(interval: SummaryInterval, now: datetime) -> tuple[datetime, 
     return start.astimezone(UTC), end.astimezone(UTC)
 
 
-def _topics(summary: Summary) -> list[dict]:
+MAX_NOTIFIED_TOPICS = 10
+MAX_TITLE_LENGTH = 80
+
+
+def _topic_titles(summary: Summary) -> list[str]:
+    """通知用のトピック見出し。不正な形でも例外にせず、メンション等を無効化する。"""
     try:
-        return json.loads(summary.body or "{}").get("topics", [])
-    except ValueError:
+        topics = json.loads(summary.body or "{}")["topics"]
+        titles = [str(t["title"]) for t in topics]
+    except (ValueError, KeyError, TypeError):
         return []
+    titles = [
+        t.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")[:MAX_TITLE_LENGTH]
+        for t in titles
+    ]
+    if len(titles) > MAX_NOTIFIED_TOPICS:
+        titles = [*titles[:MAX_NOTIFIED_TOPICS], f"ほか {len(titles) - MAX_NOTIFIED_TOPICS} 件"]
+    return titles
 
 
 def run_scheduled_summary(
@@ -95,7 +108,7 @@ def run_scheduled_summary(
         raise
     if summary is not None and summary.status == STATUS_SUCCEEDED:
         lines = [f"期間: {start:%Y-%m-%d}〜{end:%Y-%m-%d} / 元記事 {len(summary.articles)} 件"]
-        lines += [f"• {t['title']}" for t in _topics(summary)]
+        lines += [f"• {t}" for t in _topic_titles(summary)]
         notifier.notify("サマリを生成しました", "\n".join(lines), path="/")
     return summary
 

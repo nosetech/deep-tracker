@@ -140,3 +140,14 @@ def test_failure_notification_can_be_disabled(env, tmp_path):
             session, MockProvider(fail=True), load_settings(cfg), now=NOW, notifier=notifier
         )
     assert notifier.sent == []
+
+
+def test_topic_titles_tolerate_malformed_body():
+    from deep_tracker.jobs.summary import _topic_titles
+
+    assert _topic_titles(Summary(body="[1]")) == []
+    assert _topic_titles(Summary(body='{"topics": null}')) == []
+    assert _topic_titles(Summary(body='{"topics": [{}]}')) == []
+    assert _topic_titles(Summary(body='{"topics": [{"title": "<!channel>"}]}')) == [
+        "&lt;!channel&gt;"
+    ]
