@@ -2,6 +2,65 @@
 
 `deep-tracker` への変更の進め方をまとめる。設計上の前提は `CLAUDE.md` と `docs/requirements.md` を参照すること。
 
+## 開発環境
+
+- Python 3.11 以上、[uv](https://docs.astral.sh/uv/)
+- Node.js（npm 同梱）
+
+```sh
+cp config/config.yaml.example config/config.yaml   # 実ファイルは .gitignore 対象
+(cd backend && uv sync)
+(cd frontend && npm install)
+```
+
+## ディレクトリ構成
+
+| パス | 内容 |
+|---|---|
+| `backend/` | Python（FastAPI）のバックエンド |
+| `frontend/` | Next.js / TypeScript のフロントエンド |
+| `config/` | 設定ファイル（`config.yaml.example` のみコミット） |
+| `scripts/` | frontend起動、launchdジョブ（フィード取得・サマリ生成）の管理スクリプト |
+| `docs/` | 要件・技術選定・セットアップ手順・デザインプロンプト |
+
+## 開発時の起動
+
+ターミナルを2つ使う。
+
+```sh
+# backend（http://127.0.0.1:8700）
+cd backend && uv run python -m deep_tracker.main
+
+# frontend（http://localhost:3700。/api/* は backend へ中継される）
+cd frontend && npm run dev
+```
+
+動作確認: `curl http://localhost:3700/api/health` が `{"status":"ok"}` を返せば、frontend から backend への中継まで通っている。
+バックエンドの接続先を変える場合は、frontend の環境変数 `BACKEND_URL`（既定 `http://127.0.0.1:8700`）を指定する。
+設定ファイルの待ち受けホスト・ポートで frontend を起動するには `scripts/frontend.sh dev` を使う（LAN公開は `docs/setup.md`）。
+
+## Lint・テスト・ビルド
+
+```sh
+# backend
+cd backend
+uv run ruff check . && uv run ruff format --check .   # 整形は uv run ruff format .
+uv run pytest
+
+# frontend
+cd frontend
+npm run lint
+npm run format:check                                  # 整形は npm run format
+npm run typecheck
+npm run build
+```
+
+> `NODE_ENV` を `development` 以外にしたシェルで `npm run build` を行うと失敗することがある。その場合は `env -u NODE_ENV npm run build` で実行する。
+
+## 画面実装のルール
+
+画面は Claude Design のデザインを**正**として実装し、独自解釈でレイアウト・配色・インタラクションを変えない。デザインの参照方法と注意点は `CLAUDE.md` の「画面デザインの実装ルール」に従うこと。
+
 ## ブランチ運用
 
 ```
