@@ -99,3 +99,9 @@ def test_message_and_gui_url(tmp_path):
     assert build_message("t") == "*t*"
     assert build_message("t", "b", "http://x") == "*t*\nb\nhttp://x"
     assert gui_url(make_settings(tmp_path, host="0.0.0.0")) == "http://localhost:3701/"
+
+
+def test_gui_url_uses_base_url(tmp_path):
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("slack: {base_url: 'http://nas.local:3700/'}\n", encoding="utf-8")
+    assert gui_url(load_settings(cfg), "/") == "http://nas.local:3700/"

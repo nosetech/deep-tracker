@@ -6,6 +6,7 @@
 """
 
 import argparse
+import json
 import logging
 import sys
 from datetime import UTC, datetime, timedelta
@@ -52,6 +53,26 @@ def summary_period(interval: SummaryInterval, now: datetime) -> tuple[datetime, 
     return start.astimezone(UTC), end.astimezone(UTC)
 
 
+MAX_NOTIFIED_TOPICS = 10
+MAX_TITLE_LENGTH = 80
+
+
+def _topic_titles(summary: Summary) -> list[str]:
+    """通知用のトピック見出し。不正な形でも例外にせず、メンション等を無効化する。"""
+    try:
+        topics = json.loads(summary.body or "{}")["topics"]
+        titles = [str(t["title"]) for t in topics]
+    except (ValueError, KeyError, TypeError):
+        return []
+    titles = [
+        t.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")[:MAX_TITLE_LENGTH]
+        for t in titles
+    ]
+    if len(titles) > MAX_NOTIFIED_TOPICS:
+        titles = [*titles[:MAX_NOTIFIED_TOPICS], f"ほか {len(titles) - MAX_NOTIFIED_TOPICS} 件"]
+    return titles
+
+
 def run_scheduled_summary(
     session: Session,
     provider: AIProvider,
@@ -80,16 +101,15 @@ def run_scheduled_summary(
     try:
         summary = generate_summary(session, provider, start, end)
     except Exception as e:
-        notifier.notify(
-            "サマリの生成に失敗しました", f"期間: {start:%Y-%m-%d}〜{end:%Y-%m-%d}\n{e}"
-        )
+        if settings.slack.notify_on_failure:
+            notifier.notify(
+                "サマリの生成に失敗しました", f"期間: {start:%Y-%m-%d}〜{end:%Y-%m-%d}\n{e}"
+            )
         raise
     if summary is not None and summary.status == STATUS_SUCCEEDED:
-        notifier.notify(
-            "サマリを生成しました",
-            f"期間: {start:%Y-%m-%d}〜{end:%Y-%m-%d} / 元記事 {len(summary.articles)} 件",
-            path="/",
-        )
+        lines = [f"期間: {start:%Y-%m-%d}〜{end:%Y-%m-%d} / 元記事 {len(summary.articles)} 件"]
+        lines += [f"• {t}" for t in _topic_titles(summary)]
+        notifier.notify("サマリを生成しました", "\n".join(lines), path="/")
     return summary
 
 
