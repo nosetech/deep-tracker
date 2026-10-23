@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3700",
+    "dev": "next dev -H ${FRONTEND_HOST:-127.0.0.1} -p ${FRONTEND_PORT:-3700}",
     "build": "next build",
-    "start": "next start -p 3700",
+    "start": "next start -H ${FRONTEND_HOST:-127.0.0.1} -p ${FRONTEND_PORT:-3700}",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "format": "prettier --write .",

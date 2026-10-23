@@ -122,6 +122,8 @@ def test_launch_settings_output(monkeypatch, tmp_path, capsys):
     finally:
         loader.get_settings.cache_clear()
     assert capsys.readouterr().out.splitlines() == [
+        "INSTANCE=default",
+        f"LOG_DIR={loader.LOG_DIR}",
         "FRONTEND_HOST=0.0.0.0",
         "FRONTEND_PORT=3710",
         "BACKEND_PORT=8710",

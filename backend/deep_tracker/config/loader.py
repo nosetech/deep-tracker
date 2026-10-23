@@ -12,6 +12,8 @@ CONFIG_ENV = "DEEP_TRACKER_CONFIG"
 # このファイルは <展開先>/backend/deep_tracker/config/loader.py にある
 DEPLOY_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_CONFIG_PATH = DEPLOY_ROOT / "config" / "config.yaml"
+# ログ・PIDファイルの置き場所（バッチと起動・停止スクリプトで共通）
+LOG_DIR = DEPLOY_ROOT / "logs"
 
 
 class ConfigError(Exception):
