@@ -28,6 +28,15 @@ def gui_url(settings: Settings, path: str = "/") -> str:
     return f"http://{host}:{settings.frontend.port}{path}"
 
 
+def warn_if_link_unreachable(settings: Settings) -> None:
+    """LAN公開中に base_url が未指定だと、通知のリンクは他端末から開けないため警告する。"""
+    if settings.slack.enabled and settings.lan_exposed and settings.slack.base_url is None:
+        logger.warning(
+            "frontend.host が 0.0.0.0 ですが slack.base_url が未指定のため、"
+            "Slack通知のリンクは localhost になり、LAN内の他端末からは開けません"
+        )
+
+
 def build_message(title: str, body: str | None = None, link: str | None = None) -> str:
     lines = [f"*{title}*"]
     if body:
@@ -46,6 +55,7 @@ class SlackNotifier:
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self._settings = settings
+        warn_if_link_unreachable(settings)
         self._client = client
         self._sleep = sleep
 
