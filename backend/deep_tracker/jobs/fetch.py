@@ -19,7 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from deep_tracker.config import ConfigError, Settings, get_settings
-from deep_tracker.config.loader import DEPLOY_ROOT
+from deep_tracker.config.loader import LOG_DIR
 from deep_tracker.db import Feed, create_db_engine, make_session_factory, upgrade_db
 from deep_tracker.db.models import utcnow
 from deep_tracker.feeds import fetch_and_store
@@ -30,7 +30,6 @@ logger = logging.getLogger("deep_tracker.jobs.fetch")
 # launchd の起動間隔の揺らぎで、間隔ちょうどのフィードが次回送りにならないための許容幅
 DUE_TOLERANCE = timedelta(seconds=60)
 
-LOG_DIR = DEPLOY_ROOT / "logs"
 LOG_MAX_BYTES = 1_000_000
 LOG_BACKUP_COUNT = 5
 

@@ -25,7 +25,7 @@ RSSリーダー + AIによる要約システム。購読しているフィード
 ```sh
 cp config/config.yaml.example config/config.yaml
 (cd backend && uv sync)
-(cd frontend && npm install && env -u NODE_ENV npm run build)
+(cd frontend && npm install)
 ```
 
 設定は `config/config.yaml` を編集して行う。**画面に設定画面はない**。変更を反映するにはアプリを再起動する（定期実行のバッチは次回の起動から反映される）。
@@ -39,17 +39,14 @@ cp config/config.yaml.example config/config.yaml
 | `slack.enabled` / `slack.webhook_url` | Slack通知の有効化とWebhook URL |
 | `frontend.host` / `frontend.port` | 画面の待ち受け。既定は `127.0.0.1:3700` |
 
-## 起動
-
-ターミナルを2つ使う。
+## 起動・停止
 
 ```sh
-# backend（127.0.0.1:8700）
-cd backend && uv run python -m deep_tracker.main
-
-# frontend（config.yaml の frontend.host / frontend.port で待ち受ける）
-scripts/frontend.sh start
+scripts/start.sh   # backend と frontend をバックグラウンドで起動（frontend は未ビルドなら自動でビルドする）
+scripts/stop.sh    # 両方を停止
 ```
+
+backend は `127.0.0.1:8700`、frontend は `config.yaml` の `frontend.host` / `frontend.port` で待ち受ける。ログは `logs/` に出る。
 
 ブラウザで <http://localhost:3700> を開く（`frontend.port` を変えた場合はそのポート）。
 

@@ -20,7 +20,7 @@ cp config/config.yaml.example config/config.yaml   # 実ファイルは .gitigno
 | `backend/` | Python（FastAPI）のバックエンド |
 | `frontend/` | Next.js / TypeScript のフロントエンド |
 | `config/` | 設定ファイル（`config.yaml.example` のみコミット） |
-| `scripts/` | frontend起動、launchdジョブ（フィード取得・サマリ生成）の管理スクリプト |
+| `scripts/` | backend・frontendの起動/停止、launchdジョブ（フィード取得・サマリ生成）の管理スクリプト |
 | `docs/` | 要件・技術選定・セットアップ手順・デザインプロンプト |
 
 ## 開発時の起動
@@ -37,7 +37,7 @@ cd frontend && npm run dev
 
 動作確認: `curl http://localhost:3700/api/health` が `{"status":"ok"}` を返せば、frontend から backend への中継まで通っている。
 バックエンドの接続先を変える場合は、frontend の環境変数 `BACKEND_URL`（既定 `http://127.0.0.1:8700`）を指定する。
-設定ファイルの待ち受けホスト・ポートで frontend を起動するには `scripts/frontend.sh dev` を使う（LAN公開は `docs/setup.md`）。
+backend と frontend をまとめてバックグラウンドで起動・停止するには `scripts/start.sh` / `scripts/stop.sh`（開発サーバで起動するには `FRONTEND_MODE=dev scripts/start.sh`。LAN公開は `docs/setup.md`）。
 
 ## Lint・テスト・ビルド
 

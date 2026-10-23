@@ -7,9 +7,14 @@ frontend の待ち受けは `config/config.yaml` の `frontend.host` / `frontend
 
 ```bash
 cd backend && uv sync && cd ..
-(cd frontend && npm install && env -u NODE_ENV npm run build)
-scripts/frontend.sh start      # 開発時は scripts/frontend.sh dev
+(cd frontend && npm install)
+scripts/start.sh               # backend と frontend をバックグラウンドで起動
+scripts/stop.sh                # 両方を停止（未起動でもエラーにならない）
 ```
+
+- `scripts/start.sh` は frontend が未ビルド（または `backend.port` を変えた後）なら自動で `npm run build` する。開発サーバで起動するには `FRONTEND_MODE=dev scripts/start.sh`
+- PID は `logs/deep-tracker.<instance>.{backend,frontend}.pid`、ログは `logs/{backend,frontend}.log` に出る。`instance` ごとにPIDが分かれるため、展開先を分ければ並行稼働できる
+- 二重起動は拒否される。異常終了でPIDファイルが残っていても、次の `scripts/start.sh` は起動できる
 
 | 設定 | 動作 |
 |---|---|
@@ -19,7 +24,7 @@ scripts/frontend.sh start      # 開発時は scripts/frontend.sh dev
 LAN公開する手順:
 
 1. `config/config.yaml` の `frontend.host` を `0.0.0.0` にする
-2. `scripts/frontend.sh` を再起動する（設定はホットリロードされない）
+2. `scripts/stop.sh` → `scripts/start.sh` で再起動する（設定はホットリロードされない）
 3. 別デバイスのブラウザから `http://<このマシンのIP>:3700` を開く。開けない場合は macOS のファイアウォール設定を確認する
 
 > **リスク**: 本アプリに認証はない。`0.0.0.0` にすると、同じネットワークに接続できる全員が購読フィードの閲覧・追加・削除、既読操作などを行える。
