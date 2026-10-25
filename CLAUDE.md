@@ -23,6 +23,10 @@ frontend（`frontend/` で実行。npm）:
 - 型チェック: `npm run typecheck`
 - ビルド: `npm run build`（`NODE_ENV` が `development` だと失敗する場合は `env -u NODE_ENV npm run build`）
 
+## 動作確認用インスタンス
+
+画面・APIの動作確認は `scripts/dev-instance.sh start|stop|status` で行う（使い方は `CONTRIBUTING.md`）。運用インスタンスとポート・DB・設定が分離され、Slack通知とClaude Code CLI呼び出しは無効になる。**`pkill` / `killall` やポート検索によるプロセスの kill はしない。** 停止は `scripts/dev-instance.sh stop` のみ。
+
 ## 画面デザインの実装ルール
 
 画面実装は、Claude Designで作成された以下のデザインを**正**として忠実に実装すること。レイアウト・配色・コンポーネント構成・インタラクションを独自解釈で変更しない。
