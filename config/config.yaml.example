@@ -23,6 +23,7 @@ feed:
   fetch_interval_minutes: 60 # フィード取得の既定間隔（分）
 ai:
   provider: claude_code # 現在は claude_code（Claude Code CLI）のみ
+  # command: /Users/<user>/.local/bin/claude # Claude Code CLI の実行パス。未指定なら PATH 上の claude。launchd では PATH が限られるため絶対パス（`which claude`）を推奨
   # model: sonnet # 未指定ならCLIの既定
   timeout_seconds: 300 # 1回のAI呼び出しのタイムアウト（秒）
   max_concurrent_jobs: 1 # AIジョブの同時実行数。サブスクリプションの制限を踏まえ既定は逐次

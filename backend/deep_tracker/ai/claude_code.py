@@ -45,11 +45,18 @@ class ClaudeCodeCLIProvider(AIProvider):
         self._runner = runner
         self._env = env
 
+    def _not_found_message(self) -> str:
+        return (
+            f"{self._command} コマンドが見つかりません"
+            "（launchd 等では PATH が限られるため、"
+            "config.yaml の ai.command に絶対パスを指定してください）"
+        )
+
     def generate(
         self, prompt: str, *, system_prompt: str | None = None, input_text: str | None = None
     ) -> AIResult:
         if shutil.which(self._command) is None and self._runner is subprocess.run:
-            raise AIUnavailableError(f"{self._command} コマンドが見つかりません")
+            raise AIUnavailableError(self._not_found_message())
 
         args = [self._command, "-p", prompt, "--output-format", "json"]
         args += ["--tools", "", "--no-session-persistence"]
@@ -72,7 +79,7 @@ class ClaudeCodeCLIProvider(AIProvider):
                     env=env,
                 )
             except FileNotFoundError as e:
-                raise AIUnavailableError(f"{self._command} コマンドが見つかりません") from e
+                raise AIUnavailableError(self._not_found_message()) from e
             except subprocess.TimeoutExpired as e:
                 raise AITimeoutError(f"{self._timeout}秒でタイムアウトしました") from e
 

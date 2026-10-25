@@ -59,6 +59,8 @@ class AIProviderName(StrEnum):
 
 class AISettings(_Section):
     provider: AIProviderName = AIProviderName.CLAUDE_CODE
+    # Claude Code CLI の実行パス。launchd では PATH が限られるため、絶対パスの指定を推奨
+    command: str = Field("claude", min_length=1)
     model: str | None = None  # 未指定ならCLIの既定
     timeout_seconds: float = Field(300, gt=0)
     # AIジョブの同時実行数。サブスクリプションの制限を踏まえ、既定は逐次（1）

@@ -116,6 +116,7 @@ scripts/summary-job.sh install
 - launchd は既定で3600秒ごとに起動する（`SUMMARY_TICK_SECONDS=1800 scripts/summary-job.sh install` で変更可）。
   期間が終わった後の最初の起動で生成される。生成済みの期間は何もしない
 - 操作（`uninstall` / `start` / `stop` / `status` / `run`）は `scripts/fetch-job.sh` と同じ
+- launchd 経由のジョブは `PATH` が `/usr/bin:/bin:/usr/sbin:/sbin` に限られ、`claude` が見つからない。`config/config.yaml` の `ai.command` に `which claude` の絶対パスを指定する（例: `command: /Users/<user>/.local/bin/claude`）
 
 ## 3. 動作
 
