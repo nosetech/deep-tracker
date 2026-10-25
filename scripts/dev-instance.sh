@@ -38,7 +38,10 @@ matches_record() {
     kill -0 "$pid" 2>/dev/null || return 1
     [[ "$(ps -o pgid= -p "$pid" | tr -d ' ')" == "$pid" ]] || return 1
     # npm はプロセス名を書き換えて環境変数が見えなくなるため、同じグループのいずれかに目印があればよい
-    ps -axww -E -o pgid=,command= 2>/dev/null | awk -v g="$pid" '$1 == g' | grep -qF "$MARKER_ENV=$token"
+    # grep -q の早期終了で pipefail が SIGPIPE を拾わないよう、出力を変数に取ってから判定する
+    local group_env
+    group_env="$(ps -axww -E -o pgid=,command= 2>/dev/null | awk -v g="$pid" '$1 == g')"
+    [[ "$group_env" == *"$MARKER_ENV=$token"* ]]
 }
 
 load_state() {
@@ -52,7 +55,8 @@ cmd_start() {
     [[ -d "$DEPLOY_ROOT/frontend/node_modules" ]] || die "frontend/node_modules がありません。frontend で npm install を実行してください"
     if load_state; then
         for svc_pid in "${BACKEND_PID:-}" "${FRONTEND_PID:-}"; do
-            if [[ -n "$svc_pid" ]] && kill -0 "$svc_pid" 2>/dev/null; then
+            # PID が再利用された無関係なプロセスは「起動中」とみなさない
+            if [[ -n "$svc_pid" ]] && matches_record "$svc_pid" "${TOKEN:-}"; then
                 die "既に起動しています。先に scripts/dev-instance.sh stop を実行してください"
             fi
         done
@@ -95,7 +99,8 @@ STATE_EOF
 
     echo "起動しました: backend http://127.0.0.1:$backend_port / frontend http://127.0.0.1:$frontend_port"
     echo "ログ: $RUN_DIR/{backend,frontend}.log"
-    wait_healthy "$backend_port" "$frontend_port"
+    # 失敗してもプロセスは残す（ログを確認し、不要なら stop する）
+    wait_healthy "$backend_port" "$frontend_port" || exit 1
 }
 
 wait_healthy() {
