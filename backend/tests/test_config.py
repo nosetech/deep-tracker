@@ -49,6 +49,12 @@ def test_override(tmp_path):
     assert s.slack.enabled
 
 
+def test_ai_command(tmp_path):
+    assert load_settings(write(tmp_path, "")).ai.command == "claude"
+    s = load_settings(write(tmp_path, "ai: {command: /opt/bin/claude}\n"))
+    assert s.ai.command == "/opt/bin/claude"
+
+
 def test_relative_db_path_resolved_to_deploy_root(tmp_path):
     s = load_settings(write(tmp_path, "db: {path: data/a.db}\n"))
     assert s.db.path == str(loader.DEPLOY_ROOT / "data/a.db")
@@ -68,6 +74,7 @@ def test_empty_file_uses_defaults(tmp_path):
         ("slack: {enabled: true}", "slack"),
         ("slack: {webhook_url: not-a-url}", "slack.webhook_url"),
         ("feed: {fetch_interval_minutes: abc}", "feed.fetch_interval_minutes"),
+        ("ai: {command: ''}", "ai.command"),
         ("instance: 'a b'", "instance"),
     ],
 )

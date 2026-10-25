@@ -78,6 +78,16 @@ def test_factory():
     assert isinstance(create_provider(AISettings()), ClaudeCodeCLIProvider)
 
 
+def test_factory_passes_command():
+    p = create_provider(AISettings(command="/opt/bin/claude"))
+    assert p._command == "/opt/bin/claude"
+
+
+def test_missing_command_path_is_unavailable():
+    with pytest.raises(AIUnavailableError, match="ai.command"):
+        ClaudeCodeCLIProvider(command="/nonexistent/claude").generate("x")
+
+
 @pytest.mark.cli
 def test_real_cli():
     r = ClaudeCodeCLIProvider().generate("1+1は?数字のみ", system_prompt="簡潔に答える")
