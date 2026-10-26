@@ -7,6 +7,7 @@ import { useToast } from "@/components/Toast";
 import { ApiErrorPanel, LoadingSkeleton } from "@/components/states";
 import { api } from "@/lib/api/client";
 import type { ArticleListItem, Feed } from "@/lib/api/types";
+import { loadSessionState, saveSessionState } from "@/lib/session-state";
 
 const PER_PAGE = 20;
 const MORE_PER_PAGE = 100;
@@ -26,6 +27,29 @@ const INITIAL_FILTER: Filter = {
   period: "all",
   q: "",
 };
+
+const FILTER_STORAGE_KEY = "deep-tracker:articles-filter";
+const PERIODS: readonly string[] = ["all", "1", "3", "7", "30"];
+
+// 保存値の検証。壊れていれば null（初期状態）にする
+function parseFilter(raw: unknown): Filter | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  if (
+    typeof r.unreadOnly !== "boolean" ||
+    typeof r.feed !== "string" ||
+    typeof r.period !== "string" ||
+    !PERIODS.includes(r.period) ||
+    typeof r.q !== "string"
+  )
+    return null;
+  return {
+    unreadOnly: r.unreadOnly,
+    feed: r.feed === "all" || /^\d+$/.test(r.feed) ? r.feed : "all",
+    period: r.period as Period,
+    q: r.q,
+  };
+}
 
 function dayKey(d: Date): number {
   return d.getFullYear() * 10000 + d.getMonth() * 100 + d.getDate();
@@ -90,8 +114,12 @@ export default function ArticlesPage() {
   const router = useRouter();
   const toast = useToast();
   const [feeds, setFeeds] = useState<Feed[] | null>(null);
-  const [filter, setFilter] = useState<Filter>(INITIAL_FILTER);
-  const [qInput, setQInput] = useState("");
+  // 記事を開いて戻ったときに条件を復元する（初回は保存済みの条件があればそれを使う）
+  const [restored] = useState(() =>
+    loadSessionState(FILTER_STORAGE_KEY, parseFilter),
+  );
+  const [filter, setFilter] = useState<Filter>(restored ?? INITIAL_FILTER);
+  const [qInput, setQInput] = useState(restored?.q ?? "");
   const [items, setItems] = useState<ArticleListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [unreadTotal, setUnreadTotal] = useState(0);
@@ -112,9 +140,21 @@ export default function ArticlesPage() {
   }, [qInput]);
 
   useEffect(() => {
+    saveSessionState(FILTER_STORAGE_KEY, { ...filter, q: qInput });
+  }, [filter, qInput]);
+
+  useEffect(() => {
     api
       .listFeeds()
-      .then(setFeeds)
+      .then((list) => {
+        setFeeds(list);
+        // 削除済みのフィードが復元された場合は絞り込みを外す
+        setFilter((f) =>
+          f.feed === "all" || list.some((x) => String(x.id) === f.feed)
+            ? f
+            : { ...f, feed: "all" },
+        );
+      })
       .catch(() => setFeeds([]));
   }, []);
 
