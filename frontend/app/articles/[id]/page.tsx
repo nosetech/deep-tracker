@@ -78,14 +78,19 @@ export default function ArticleDetailPage() {
   const fromSummary = useSearchParams().get("from") === "summary";
   const backLabel = fromSummary ? "サマリに戻る" : "記事一覧に戻る";
 
-  // 新旧記事への移動は履歴を積まず、戻る先を一覧(サマリ)のままにする
-  const goAdjacent = (targetId: number) =>
-    router.replace(
-      `/articles/${targetId}${fromSummary ? "?from=summary" : ""}`,
-    );
+  // 新旧記事へ移動した回数。URLの depth に持ち、「戻る」で一覧まで一度に戻る
+  const searchParams = useSearchParams();
+  const depth = Number(searchParams.get("depth")) || 0;
+
+  // 新旧記事への移動は履歴を積む(ブラウザの戻るで直前の記事に戻れる)
+  const goAdjacent = (targetId: number) => {
+    const q = new URLSearchParams({ depth: String(depth + 1) });
+    if (fromSummary) q.set("from", "summary");
+    router.push(`/articles/${targetId}?${q}`);
+  };
 
   const goBack = () => {
-    if (window.history.length > 1) router.back();
+    if (window.history.length > depth + 1) window.history.go(-(depth + 1));
     else router.push(fromSummary ? "/" : "/articles");
   };
 
