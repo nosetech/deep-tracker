@@ -45,8 +45,10 @@ if [[ "$FRONTEND_HOST" == "0.0.0.0" ]]; then
 fi
 
 # BACKEND_URL は /api/* の中継先。backend は常に 127.0.0.1
+# ALLOWED_DEV_ORIGINS は next dev が許可する接続元ホスト（既定は slack.base_url のホスト）
 (cd "$DEPLOY_ROOT/frontend" &&
     FRONTEND_HOST="$FRONTEND_HOST" FRONTEND_PORT="$FRONTEND_PORT" BACKEND_URL="$BACKEND_URL" \
+        ALLOWED_DEV_ORIGINS="${ALLOWED_DEV_ORIGINS:-$BASE_URL_HOST}" \
         nohup npm run "$MODE" >>"$LOG_DIR/frontend.log" 2>&1 & echo $! >"$(pid_file frontend)")
 
 echo "起動しました: backend http://127.0.0.1:$BACKEND_PORT / frontend http://$FRONTEND_HOST:$FRONTEND_PORT"
