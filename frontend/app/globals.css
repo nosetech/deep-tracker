@@ -113,11 +113,25 @@ a:hover {
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  padding: 36px 44px;
+  --main-pad-top: 36px;
+  padding: var(--main-pad-top) 44px;
+}
+
+/* 記事一覧: sticky の日付見出しの上にスクロール中の内容が見えないよう、
+   上paddingを疑似要素の余白に置き換えて見出しを .main の上端に固定する */
+.main:has(.art-day) {
+  padding-top: 0;
+}
+
+.main:has(.art-day)::before {
+  content: "";
+  display: block;
+  height: var(--main-pad-top);
 }
 
 @media (max-width: 999px) {
   .main {
+    --main-pad-top: 28px;
     padding: 28px;
   }
 }
@@ -294,6 +308,7 @@ a:hover {
   }
 
   .main {
+    --main-pad-top: 16px;
     padding: 16px 16px 80px;
   }
 
