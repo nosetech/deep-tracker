@@ -78,6 +78,12 @@ export default function ArticleDetailPage() {
   const fromSummary = useSearchParams().get("from") === "summary";
   const backLabel = fromSummary ? "サマリに戻る" : "記事一覧に戻る";
 
+  // 新旧記事への移動は履歴を積まず、戻る先を一覧(サマリ)のままにする
+  const goAdjacent = (targetId: number) =>
+    router.replace(
+      `/articles/${targetId}${fromSummary ? "?from=summary" : ""}`,
+    );
+
   const goBack = () => {
     if (window.history.length > 1) router.back();
     else router.push(fromSummary ? "/" : "/articles");
@@ -210,7 +216,7 @@ export default function ArticleDetailPage() {
             <button
               type="button"
               className="det-nav-btn"
-              onClick={() => router.push(`/articles/${article.newer!.id}`)}
+              onClick={() => goAdjacent(article.newer!.id)}
             >
               <span className="det-nav-label">← 新しい記事</span>
               <span className="det-nav-title">{article.newer.title}</span>
@@ -222,7 +228,7 @@ export default function ArticleDetailPage() {
             <button
               type="button"
               className="det-nav-btn det-nav-older"
-              onClick={() => router.push(`/articles/${article.older!.id}`)}
+              onClick={() => goAdjacent(article.older!.id)}
             >
               <span className="det-nav-label">古い記事 →</span>
               <span className="det-nav-title">{article.older.title}</span>
