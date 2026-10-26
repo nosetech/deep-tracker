@@ -17,6 +17,9 @@ def main() -> int:
     print(f"FRONTEND_HOST={shlex.quote(settings.frontend.host)}")
     print(f"FRONTEND_PORT={settings.frontend.port}")
     print(f"BACKEND_PORT={settings.backend.port}")
+    # next dev が LAN 内の別ホストからのアクセスを許可するための接続元ホスト
+    base_host = settings.slack.base_url.host if settings.slack.base_url else ""
+    print(f"BASE_URL_HOST={shlex.quote(base_host or '')}")
     return 0
 
 

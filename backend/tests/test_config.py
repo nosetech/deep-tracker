@@ -134,4 +134,5 @@ def test_launch_settings_output(monkeypatch, tmp_path, capsys):
         "FRONTEND_HOST=0.0.0.0",
         "FRONTEND_PORT=3710",
         "BACKEND_PORT=8710",
+        "BASE_URL_HOST=''",
     ]
