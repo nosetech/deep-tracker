@@ -25,3 +25,7 @@ node_modules/
 
 # Serena
 .serena/
+
+# 動作確認用インスタンスの実行時ファイル
+.dev-run/
+.next-dev/

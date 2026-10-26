@@ -11,6 +11,7 @@ from collections.abc import Callable
 import httpx
 
 from deep_tracker.config import Settings
+from deep_tracker.config.dev import is_dev_mode
 
 logger = logging.getLogger("deep_tracker.notify.slack")
 
@@ -66,6 +67,9 @@ class SlackNotifier:
 
     def notify(self, title: str, body: str | None = None, path: str | None = None) -> bool:
         """通知を送る。送信できたら True。無効時・失敗時は False（例外は出さない）。"""
+        if is_dev_mode():
+            logger.info("動作確認用インスタンスのため、Slack通知は送信しません: %s", title)
+            return False
         if not self.enabled:
             return False
         link = gui_url(self._settings, path) if path is not None else None
