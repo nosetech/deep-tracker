@@ -53,6 +53,22 @@ def summary_period(interval: SummaryInterval, now: datetime) -> tuple[datetime, 
     return start.astimezone(UTC), end.astimezone(UTC)
 
 
+def next_summary_run(interval: SummaryInterval, now: datetime) -> datetime:
+    """`now` 以降で最初に訪れる期間の区切り（ローカル時刻 0 時）を、`now` と同じタイムゾーンで返す。
+
+    `summary_period()` の end（直近の区切り）の次の区切りにあたる。
+    """
+    _, end = summary_period(interval, now)
+    end = end.astimezone(now.tzinfo)
+    if interval == SummaryInterval.DAILY:
+        nxt = end + timedelta(days=1)
+    elif interval == SummaryInterval.WEEKLY:
+        nxt = end + timedelta(days=7)
+    else:
+        nxt = (end.replace(day=28) + timedelta(days=4)).replace(day=1)
+    return nxt
+
+
 MAX_NOTIFIED_TOPICS = 10
 MAX_TITLE_LENGTH = 80
 

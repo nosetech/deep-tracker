@@ -141,3 +141,21 @@ def test_generation_failed_rate_limited(client, factory):
     assert state["reset_text"] == "15:00"
     # 閉じたジョブは idle 扱い
     assert client.get(f"/api/summaries/generation?dismissed={job_id}").json()["state"] == "idle"
+
+
+@pytest.mark.parametrize("interval", ["daily", "weekly", "monthly"])
+def test_config_returns_next_run(client, monkeypatch, tmp_path, interval):
+    cfg = tmp_path / "interval.yaml"
+    cfg.write_text(f"summary: {{interval: {interval}}}\n", encoding="utf-8")
+    monkeypatch.setattr("deep_tracker.api.summaries.get_settings", lambda: load_settings(cfg))
+    body = client.get("/api/summaries/config").json()
+    assert body["interval"] == interval
+    next_run = datetime.fromisoformat(body["next_run_at"])
+    assert next_run.tzinfo is not None
+    assert next_run > datetime.now(UTC)
+    assert (next_run.hour, next_run.minute) == (0, 0)
+    assert next_run - datetime.now(UTC) <= timedelta(days=32)
+    if interval == "weekly":
+        assert next_run.weekday() == 0
+    if interval == "monthly":
+        assert next_run.day == 1
