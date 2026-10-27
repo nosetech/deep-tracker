@@ -2,8 +2,15 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { SHELL_REFRESH_EVENT } from "@/components/AppShell";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { createPortal } from "react-dom";
+import { PREVIEW_SLOT_ID, SHELL_REFRESH_EVENT } from "@/components/AppShell";
 import { useToast } from "@/components/Toast";
 import {
   ApiErrorPanel,
@@ -11,7 +18,9 @@ import {
   LoadingSkeleton,
 } from "@/components/states";
 import { api } from "@/lib/api/client";
+import { ArticlePreview } from "./_components/ArticlePreview";
 import type {
+  ArticleDetail,
   GenerationState,
   SummaryConfig,
   SummaryDetail,
@@ -20,6 +29,15 @@ import type {
 } from "@/lib/api/types";
 
 const POLL_MS = 2000;
+// この幅以上のときだけ、元記事を画面遷移せずプレビューする（デザインの PC 幅）
+const PREVIEW_MIN_WIDTH = 1180;
+const PREVIEW_QUERY = `(min-width: ${PREVIEW_MIN_WIDTH}px)`;
+
+function subscribeWide(cb: () => void) {
+  const mq = window.matchMedia(PREVIEW_QUERY);
+  mq.addEventListener("change", cb);
+  return () => mq.removeEventListener("change", cb);
+}
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 const STEP_LABELS = [
   "対象期間の記事を収集",
@@ -96,6 +114,23 @@ function refreshShell() {
   window.dispatchEvent(new Event(SHELL_REFRESH_EVENT));
 }
 
+// プレビューで本文が狭くなっても、選んだ元記事が見える位置に寄せる
+function revealSource(id: number) {
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      const main = document.querySelector<HTMLElement>(".main");
+      const row = main?.querySelector<HTMLElement>(`[data-src-id="${id}"]`);
+      if (!main || !row) return;
+      const rel =
+        row.getBoundingClientRect().top - main.getBoundingClientRect().top;
+      const visible = main.clientHeight - 24;
+      if (rel < 16 || rel + row.offsetHeight > visible) {
+        main.scrollTop += rel - Math.max(16, Math.round(visible * 0.35));
+      }
+    }),
+  );
+}
+
 function scrollTop() {
   document.querySelector(".main")?.scrollTo(0, 0);
 }
@@ -130,6 +165,14 @@ export default function SummaryPage() {
   // 設定取得前は null（誤った周期を一瞬出さない）
   const [schedule, setSchedule] = useState<SummaryConfig | null>(null);
   const [noFeeds, setNoFeeds] = useState(false);
+  // 画面遷移せずプレビュー表示している元記事
+  const [previewId, setPreviewId] = useState<number | null>(null);
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  const wide = useSyncExternalStore(
+    subscribeWide,
+    () => window.matchMedia(PREVIEW_QUERY).matches,
+    () => false,
+  );
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -165,6 +208,11 @@ export default function SummaryPage() {
     },
     [dismissed],
   );
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSlot(document.getElementById(PREVIEW_SLOT_ID));
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -228,6 +276,7 @@ export default function SummaryPage() {
 
   const select = (id: number) => {
     setSelected(id);
+    setPreviewId(null);
     scrollTop();
     void api
       .getSummary(id)
@@ -243,16 +292,51 @@ export default function SummaryPage() {
   };
 
   const openSource = (s: SummarySource) => {
-    if (!s.is_read) {
-      void api.setArticleRead(s.id, true).then(refreshShell, () => {});
+    // 狭い画面ではプレビューせず、記事画面へ遷移する
+    if (!wide) {
+      if (!s.is_read) {
+        void api.setArticleRead(s.id, true).then(refreshShell, () => {});
+      }
+      router.push(`/articles/${s.id}?from=summary`);
+      return;
     }
-    router.push(`/articles/${s.id}?from=summary`);
+    setPreviewId((cur) => (cur === s.id ? null : s.id));
+    revealSource(s.id);
+  };
+
+  // 取得できた元記事を既読にし、サマリ内の表示にも反映する
+  const markSourceRead = (a: ArticleDetail) => {
+    if (a.is_read) return;
+    void api.setArticleRead(a.id, true).then(
+      () => {
+        refreshShell();
+        setDetail(
+          (d) =>
+            d && {
+              ...d,
+              topics: d.topics.map((t) => ({
+                ...t,
+                sources: t.sources.map((s) =>
+                  s.id === a.id ? { ...s, is_read: true } : s,
+                ),
+              })),
+            },
+        );
+      },
+      () => {},
+    );
   };
 
   const dismiss = () => {
     setDismissed(generation?.job_id ?? null);
     setGeneration({ ...generation!, state: "idle" });
   };
+
+  // 表示中のサマリが引用している元記事だけをプレビューする
+  const previewOpen =
+    wide &&
+    previewId !== null &&
+    !!detail?.topics.some((t) => t.sources.some((s) => s.id === previewId));
 
   const failed = generation?.state === "failed";
   const busy = running || starting;
@@ -271,7 +355,7 @@ export default function SummaryPage() {
   );
 
   return (
-    <div className="sum-page">
+    <div className={`sum-page${previewOpen ? " has-pv" : ""}`}>
       <div className="sum-main">
         <div className="sum-head">
           <h1 className="page-title sum-title">サマリ</h1>
@@ -417,10 +501,15 @@ export default function SummaryPage() {
                     元記事 {t.sources.length}件
                   </div>
                   {t.sources.map((s) => (
-                    <div key={s.id} className="sum-src">
+                    <div
+                      key={s.id}
+                      className={`sum-src${previewOpen && previewId === s.id ? " is-on" : ""}`}
+                    >
                       <button
                         type="button"
                         className={`sum-src-open${s.is_read ? "" : " is-unread"}`}
+                        data-src-id={s.id}
+                        aria-expanded={previewOpen && previewId === s.id}
                         onClick={() => openSource(s)}
                       >
                         <span className="sum-src-dot" aria-hidden="true" />
@@ -465,6 +554,18 @@ export default function SummaryPage() {
           </article>
         )}
       </div>
+
+      {previewOpen &&
+        previewId !== null &&
+        slot &&
+        createPortal(
+          <ArticlePreview
+            id={previewId}
+            onClose={() => setPreviewId(null)}
+            onLoaded={markSourceRead}
+          />,
+          slot,
+        )}
 
       {list.length > 0 && (
         <aside className="sum-side">

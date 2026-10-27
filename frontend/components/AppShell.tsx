@@ -7,6 +7,9 @@ import { api } from "@/lib/api/client";
 import { ThemeToggle } from "./ThemeToggle";
 import { ToastProvider } from "./Toast";
 
+// サマリの元記事プレビューを、main の右隣に差し込む場所
+export const PREVIEW_SLOT_ID = "preview-slot";
+
 export const SHELL_REFRESH_EVENT = "dt:shell-refresh";
 
 type NavKey = "summary" | "articles" | "feeds";
@@ -186,7 +189,10 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="desktop-header">
             <ThemeToggle />
           </div>
-          <main className="main">{children}</main>
+          <div className="main-row">
+            <main className="main">{children}</main>
+            <div id={PREVIEW_SLOT_ID} className="pv-slot" />
+          </div>
 
           <nav className="bottom-nav" aria-label="メインナビゲーション">
             {NAV.map((n) => (
