@@ -1,4 +1,5 @@
 import type {
+  AppConfig,
   ArticleDetail,
   ArticleList,
   ArticleQuery,
@@ -93,6 +94,7 @@ export const api = {
   listSummaries: () => request<SummaryListItem[]>("/summaries"),
   getSummary: (id: number) => request<SummaryDetail>(`/summaries/${id}`),
   getLatestSummary: () => request<SummaryDetail>("/summaries/latest"),
+  getConfig: () => request<AppConfig>("/config"),
   getSummaryConfig: () => request<SummaryConfig>("/summaries/config"),
   getGeneration: (dismissed?: number | null) =>
     request<GenerationState>(

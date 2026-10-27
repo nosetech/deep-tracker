@@ -118,6 +118,27 @@ def test_config_api_hides_secrets(monkeypatch, tmp_path):
     assert "hooks.slack.com" not in str(body)
 
 
+def test_config_api_returns_pyproject_version():
+    import tomllib
+    from pathlib import Path
+
+    pyproject = Path(__file__).parents[1] / "pyproject.toml"
+    expected = tomllib.loads(pyproject.read_text())["project"]["version"]
+    assert TestClient(app).get("/api/config").json()["version"] == expected
+
+
+def test_config_api_version_unknown_without_metadata(monkeypatch):
+    from importlib.metadata import PackageNotFoundError
+
+    from deep_tracker.api import config as config_api
+
+    def missing(_name):
+        raise PackageNotFoundError
+
+    monkeypatch.setattr(config_api, "version", missing)
+    assert TestClient(app).get("/api/config").json()["version"] == "unknown"
+
+
 def test_launch_settings_output(monkeypatch, tmp_path, capsys):
     from deep_tracker.config import __main__ as launch
 

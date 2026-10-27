@@ -171,6 +171,24 @@ a:hover {
   letter-spacing: 0.01em;
 }
 
+.brand-text {
+  position: relative;
+  min-width: 0;
+}
+
+/* アプリ名の下に重ねて置き、有無でアプリ名の位置が動かないようにする */
+.brand-version {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  margin-top: 1px;
+  font-family: var(--font-plex-mono), "IBM Plex Mono", monospace;
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--tx3);
+  white-space: nowrap;
+}
+
 .nav-list {
   display: flex;
   flex-direction: column;

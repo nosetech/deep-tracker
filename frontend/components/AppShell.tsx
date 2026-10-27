@@ -102,6 +102,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [unread, setUnread] = useState(0);
   const [errorCount, setErrorCount] = useState(0);
   const [lastFetch, setLastFetch] = useState<string | null>(null);
+  const [version, setVersion] = useState<string | null>(null);
 
   const [refreshTick, setRefreshTick] = useState(0);
 
@@ -110,6 +111,14 @@ export function AppShell({ children }: { children: ReactNode }) {
     const onRefresh = () => setRefreshTick((n) => n + 1);
     window.addEventListener(SHELL_REFRESH_EVENT, onRefresh);
     return () => window.removeEventListener(SHELL_REFRESH_EVENT, onRefresh);
+  }, []);
+
+  // バージョンは起動中に変わらないので1回だけ取得する。取得できなければ表示しない
+  useEffect(() => {
+    api
+      .getConfig()
+      .then((c) => setVersion(c.version === "unknown" ? null : c.version))
+      .catch(() => {});
   }, []);
 
   // 画面遷移のたびに再取得し、バッジ・エラー表示を最新に保つ
@@ -165,7 +174,14 @@ export function AppShell({ children }: { children: ReactNode }) {
                 strokeLinecap="round"
               />
             </svg>
-            <div className="brand-name">Deep Tracker</div>
+            <div className="brand-text">
+              <div className="brand-name">Deep Tracker</div>
+              {version && (
+                <div className="brand-version">
+                  v{version.replace(/^v/, "")}
+                </div>
+              )}
+            </div>
           </div>
           <div className="nav-list">
             {NAV.map((n) => (
