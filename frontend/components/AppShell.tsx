@@ -143,7 +143,28 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="app">
         <nav className="sidebar" aria-label="メインナビゲーション">
           <div className="brand">
-            <div className="brand-mark">DT</div>
+            <svg className="brand-mark" viewBox="0 0 64 64" aria-hidden="true">
+              <rect width="64" height="64" rx="14" fill="var(--tx)" />
+              <path
+                d="M15 14H28A18 18 0 0 1 28 50H15Z"
+                fill="none"
+                stroke="var(--bg)"
+                strokeWidth="5.5"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M24 25H32M24 39H30"
+                stroke="var(--bg)"
+                strokeWidth="4"
+                strokeLinecap="round"
+              />
+              <path
+                d="M24 32H37"
+                stroke="#f2c14e"
+                strokeWidth="4"
+                strokeLinecap="round"
+              />
+            </svg>
             <div className="brand-name">Deep Tracker</div>
           </div>
           <div className="nav-list">
