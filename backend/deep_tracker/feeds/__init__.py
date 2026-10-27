@@ -1,6 +1,7 @@
 from deep_tracker.feeds.fetcher import FetchResult, FetchStatus, fetch_feed
 from deep_tracker.feeds.parser import FeedParseError, ParsedEntry, parse_feed, parse_feed_title
 from deep_tracker.feeds.service import (
+    change_feed_url,
     describe_error,
     fetch_all_feeds,
     fetch_and_store,
@@ -8,6 +9,7 @@ from deep_tracker.feeds.service import (
 )
 
 __all__ = [
+    "change_feed_url",
     "FeedParseError",
     "FetchResult",
     "FetchStatus",

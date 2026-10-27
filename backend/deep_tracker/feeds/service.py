@@ -69,6 +69,27 @@ def register_feed(
     return feed
 
 
+def change_feed_url(
+    session: Session, feed: Feed, url: str, *, client: httpx.Client | None = None
+) -> None:
+    """URLを取得・解析できることを確認してから付け替え、取得した記事も保存する。
+
+    取得・解析に失敗した場合は何も変更せず、httpx.HTTPError または FeedParseError を送出する。
+    旧URLの条件付きGET用の etag / last_modified は新URLの値で置き換える。
+    """
+    now = utcnow()
+    result = fetch_feed(url, client=client)
+    entries = parse_feed(result.content)
+    feed.url = url
+    feed.etag = result.etag
+    feed.last_modified = result.last_modified
+    feed.last_fetch_ok = True
+    feed.last_fetch_error = None
+    feed.last_fetched_at = now
+    _store_entries(session, feed, entries, now)
+    session.commit()
+
+
 def fetch_all_feeds(session: Session, *, client: httpx.Client | None = None) -> dict[int, int]:
     """有効な全フィードを取得する。1つが失敗しても残りを続行し、{feed_id: 追加件数} を返す。"""
     feeds = session.scalars(select(Feed).where(Feed.enabled.is_(True)).order_by(Feed.id)).all()

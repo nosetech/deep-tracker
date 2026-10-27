@@ -41,7 +41,14 @@ function refreshShell() {
 
 type Modal =
   | { type: "delete"; feed: Feed }
-  | { type: "edit"; feed: Feed; name: string; interval: string };
+  | {
+      type: "edit";
+      feed: Feed;
+      name: string;
+      url: string;
+      interval: string;
+      err: string;
+    };
 
 export default function FeedsPage() {
   const toast = useToast();
@@ -209,13 +216,31 @@ export default function FeedsPage() {
         const updated = await api.updateFeed(modal.feed.id, {
           name: modal.name.trim() || modal.feed.name,
           fetch_interval_minutes: Number(modal.interval),
+          // URLが変わったときだけ送る（変更時はバックエンドが取得・解析を検証する）
+          ...(modal.url.trim() !== modal.feed.url
+            ? { url: modal.url.trim() }
+            : {}),
         });
         replaceFeed(updated);
         toast("フィードを更新しました", "success");
       }
       setModal(null);
       refreshShell();
-    } catch {
+    } catch (err) {
+      if (modal.type === "edit" && err instanceof ApiError && err.code) {
+        const message =
+          err.code === "invalid_url"
+            ? "URLの形式が正しくありません。http:// または https:// から始まるURLを入力してください。"
+            : err.code === "duplicate_url"
+              ? "このフィードはすでに登録されています。"
+              : err.code === "not_a_feed"
+                ? `RSS / Atom として解析できませんでした。${err.message}`
+                : "";
+        if (message) {
+          setModal({ ...modal, err: message });
+          return;
+        }
+      }
       toast("操作を完了できませんでした", "error");
     } finally {
       setModalBusy(false);
@@ -427,11 +452,13 @@ export default function FeedsPage() {
                           type: "edit",
                           feed: f,
                           name: f.name,
+                          url: f.url,
                           interval: String(f.effective_fetch_interval_minutes),
+                          err: "",
                         });
                       }}
                     >
-                      名称・取得間隔を編集
+                      名称・URL・取得間隔を編集
                     </button>
                     <button
                       type="button"
@@ -496,6 +523,26 @@ export default function FeedsPage() {
                   />
                 </label>
                 <label>
+                  URL
+                  <input
+                    type="url"
+                    inputMode="url"
+                    value={modal.url}
+                    aria-invalid={modal.err ? true : undefined}
+                    style={{
+                      borderColor: modal.err ? "var(--err)" : undefined,
+                    }}
+                    onChange={(e) =>
+                      setModal({ ...modal, url: e.target.value, err: "" })
+                    }
+                  />
+                </label>
+                {modal.err && (
+                  <div role="alert" className="feed-add-err">
+                    <span>{modal.err}</span>
+                  </div>
+                )}
+                <label>
                   取得間隔
                   <select
                     value={modal.interval}
@@ -515,7 +562,6 @@ export default function FeedsPage() {
                     ))}
                   </select>
                 </label>
-                <div className="modal-url">{modal.feed.url}</div>
               </div>
             )}
             <div className="modal-actions">
@@ -538,7 +584,11 @@ export default function FeedsPage() {
                 disabled={modalBusy}
                 onClick={() => void submitModal()}
               >
-                {modal.type === "delete" ? "削除する" : "保存"}
+                {modal.type === "delete"
+                  ? "削除する"
+                  : modalBusy
+                    ? "検証中…"
+                    : "保存"}
               </button>
             </div>
           </div>
