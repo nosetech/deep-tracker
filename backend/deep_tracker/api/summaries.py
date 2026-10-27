@@ -20,6 +20,7 @@ from deep_tracker.jobs.ai_jobs import (
     enqueue_job,
     is_rate_limited,
 )
+from deep_tracker.jobs.summary import next_summary_run
 from deep_tracker.summary.service import JOB_KIND
 
 router = APIRouter(prefix="/summaries", tags=["summaries"])
@@ -116,6 +117,7 @@ class GenerationState(BaseModel):
 
 class SummaryConfig(BaseModel):
     interval: str
+    next_run_at: datetime
 
 
 def _succeeded():
@@ -192,7 +194,11 @@ def list_summaries(session: SessionDep) -> list[SummaryListItem]:
 
 @router.get("/config", response_model=SummaryConfig)
 def get_summary_config() -> SummaryConfig:
-    return SummaryConfig(interval=get_settings().summary.interval.value)
+    interval = get_settings().summary.interval
+    return SummaryConfig(
+        interval=interval.value,
+        next_run_at=next_summary_run(interval, datetime.now().astimezone()),
+    )
 
 
 @router.get("/latest", response_model=SummaryDetail)

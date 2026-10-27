@@ -27,15 +27,20 @@ const STEP_LABELS = [
   "サマリを保存",
 ];
 const SCHEDULE_TEXT: Record<SummaryConfig["interval"], string> = {
-  daily: "毎日（前日を対象）",
-  weekly: "毎週（前週の月〜日を対象）",
-  monthly: "毎月（前月を対象）",
+  daily: "毎日 0:00 以降（前日を対象）",
+  weekly: "毎週 月曜 0:00 以降（前週の月曜〜日曜を対象）",
+  monthly: "毎月1日 0:00 以降（前月を対象）",
 };
 
 const p2 = (n: number) => String(n).padStart(2, "0");
 const hm = (d: Date) => `${p2(d.getHours())}:${p2(d.getMinutes())}`;
 const mdw = (d: Date) =>
   `${d.getMonth() + 1}月${d.getDate()}日（${WEEKDAYS[d.getDay()]}）`;
+
+function nextRunText(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}/${p2(d.getMonth() + 1)}/${p2(d.getDate())}（${WEEKDAYS[d.getDay()]}）${d.getHours()}:${p2(d.getMinutes())} 以降`;
+}
 
 function sameDay(a: Date, b: Date): boolean {
   return (
@@ -122,8 +127,8 @@ export default function SummaryPage() {
   const [selected, setSelected] = useState<number | null>(null);
   const [generation, setGeneration] = useState<GenerationState | null>(null);
   const [dismissed, setDismissed] = useState<number | null>(null);
-  const [interval, setIntervalKind] =
-    useState<SummaryConfig["interval"]>("weekly");
+  // 設定取得前は null（誤った周期を一瞬出さない）
+  const [schedule, setSchedule] = useState<SummaryConfig | null>(null);
   const [noFeeds, setNoFeeds] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState(false);
@@ -149,7 +154,7 @@ export default function SummaryPage() {
         setDetail(d);
         setSelected(d && !d.is_latest ? d.id : null);
         setGeneration(state);
-        setIntervalKind(cfg.interval);
+        setSchedule(cfg);
         setNoFeeds(feeds.length === 0);
         setLoadError(false);
       } catch {
@@ -480,7 +485,13 @@ export default function SummaryPage() {
               </button>
             ))}
           </div>
-          <p className="sum-side-note">定期実行：{SCHEDULE_TEXT[interval]}</p>
+          {schedule && (
+            <p className="sum-side-note">
+              定期実行：{SCHEDULE_TEXT[schedule.interval]}
+              <br />
+              次回実行予定：{nextRunText(schedule.next_run_at)}
+            </p>
+          )}
         </aside>
       )}
     </div>

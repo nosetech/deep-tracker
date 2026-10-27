@@ -15,7 +15,7 @@ from deep_tracker.db import (
     make_session_factory,
     upgrade_db,
 )
-from deep_tracker.jobs.summary import run_scheduled_summary, summary_period
+from deep_tracker.jobs.summary import next_summary_run, run_scheduled_summary, summary_period
 
 JST = timezone(timedelta(hours=9))
 # 2026-01-14(水) 10:00 JST
@@ -86,6 +86,27 @@ def test_summary_period(interval, start, end):
     now = datetime(2026, 1, 14, 10, 0, tzinfo=JST)
     got = summary_period(interval, now)
     assert got == (start.replace(tzinfo=UTC), end.replace(tzinfo=UTC))
+
+
+@pytest.mark.parametrize(
+    ("interval", "now", "expected"),
+    [
+        (SummaryInterval.DAILY, datetime(2026, 1, 14, 10, 0), datetime(2026, 1, 15)),
+        (SummaryInterval.DAILY, datetime(2026, 1, 14, 0, 0), datetime(2026, 1, 15)),
+        # 2026-01-12 は月曜
+        (SummaryInterval.WEEKLY, datetime(2026, 1, 12, 0, 0), datetime(2026, 1, 19)),
+        (SummaryInterval.WEEKLY, datetime(2026, 1, 12, 12, 0), datetime(2026, 1, 19)),
+        (SummaryInterval.WEEKLY, datetime(2026, 1, 14, 10, 0), datetime(2026, 1, 19)),
+        (SummaryInterval.WEEKLY, datetime(2026, 1, 18, 23, 59), datetime(2026, 1, 19)),
+        (SummaryInterval.MONTHLY, datetime(2026, 1, 1, 0, 0), datetime(2026, 2, 1)),
+        (SummaryInterval.MONTHLY, datetime(2026, 1, 31, 23, 59), datetime(2026, 2, 1)),
+        (SummaryInterval.MONTHLY, datetime(2026, 12, 15, 9, 0), datetime(2027, 1, 1)),
+    ],
+)
+def test_next_summary_run(interval, now, expected):
+    got = next_summary_run(interval, now.replace(tzinfo=JST))
+    assert got == expected.replace(tzinfo=JST)
+    assert got.utcoffset() == JST.utcoffset(None)
 
 
 def test_generates_once_per_period(env):

@@ -133,4 +133,5 @@ export type GenerationState = {
 
 export type SummaryConfig = {
   interval: "daily" | "weekly" | "monthly";
+  next_run_at: string;
 };
