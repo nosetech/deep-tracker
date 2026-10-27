@@ -204,3 +204,82 @@ def test_openapi_lists_feed_endpoints(client):
     paths = client.get("/openapi.json").json()["paths"]
     assert "/api/feeds" in paths
     assert "/api/feeds/{feed_id}/fetch" in paths
+
+
+NEW_URL = "https://example.com/new-feed.xml"
+
+
+def test_update_url(client, factory, handler):
+    feed_id = add(client).json()["id"]
+    with factory() as s:
+        feed = s.get(Feed, feed_id)
+        feed.etag, feed.last_modified = "old-etag", "old-lm"
+        article = s.scalars(select(Article)).first()
+        article.is_read = True
+        read_id = article.id
+        s.commit()
+    handler.fn = lambda req: httpx.Response(200, content=AWS_XML)
+    res = client.patch(f"/api/feeds/{feed_id}", json={"url": NEW_URL, "name": "改名"})
+    assert res.status_code == 200
+    assert res.json()["url"] == NEW_URL
+    assert res.json()["name"] == "改名"
+    assert res.json()["last_fetch_ok"] is True
+    with factory() as s:
+        feed = s.get(Feed, feed_id)
+        # 旧URLの条件付きGET用の値は引き継がない
+        assert feed.etag is None and feed.last_modified is None
+        # 既存記事は保持され、既読状態も変わらない
+        assert s.get(Article, read_id).is_read is True
+        guids = list(s.scalars(select(Article.guid)))
+        assert len(guids) == len(set(guids))
+
+
+def test_update_url_same_url_is_noop(client, handler):
+    feed_id = add(client).json()["id"]
+    handler.fn = lambda req: httpx.Response(500)
+    res = client.patch(f"/api/feeds/{feed_id}", json={"url": AWS_URL})
+    assert res.status_code == 200
+    assert res.json()["url"] == AWS_URL
+
+
+@pytest.mark.parametrize("url", ["", "ftp://example.com/feed", "not a url"])
+def test_update_url_invalid(client, factory, url):
+    feed_id = add(client).json()["id"]
+    res = client.patch(f"/api/feeds/{feed_id}", json={"url": url})
+    assert res.status_code == 422
+    assert res.json()["detail"]["code"] == "invalid_url"
+    with factory() as s:
+        assert s.get(Feed, feed_id).url == AWS_URL
+
+
+def test_update_url_duplicate(client, factory):
+    first = add(client).json()["id"]
+    add(client, NEW_URL)
+    res = client.patch(f"/api/feeds/{first}", json={"url": NEW_URL})
+    assert res.status_code == 409
+    assert res.json()["detail"]["code"] == "duplicate_url"
+    with factory() as s:
+        assert s.get(Feed, first).url == AWS_URL
+
+
+@pytest.mark.parametrize(
+    "fn",
+    [
+        lambda req: httpx.Response(200, content=b"<html>not a feed</html>"),
+        lambda req: httpx.Response(404),
+    ],
+)
+def test_update_url_not_a_feed(client, factory, handler, fn):
+    feed_id = add(client).json()["id"]
+    with factory() as s:
+        s.get(Feed, feed_id).etag = "keep"
+        s.commit()
+    handler.fn = fn
+    res = client.patch(f"/api/feeds/{feed_id}", json={"url": NEW_URL, "name": "変えない"})
+    assert res.status_code == 422
+    assert res.json()["detail"]["code"] == "not_a_feed"
+    with factory() as s:
+        feed = s.get(Feed, feed_id)
+        assert feed.url == AWS_URL
+        assert feed.etag == "keep"
+        assert feed.name != "変えない"

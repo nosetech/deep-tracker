@@ -56,6 +56,7 @@ export const api = {
     id: number,
     body: {
       name?: string;
+      url?: string;
       fetch_interval_minutes?: number | null;
       enabled?: boolean;
     },

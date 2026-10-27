@@ -12,7 +12,13 @@ from sqlalchemy.orm import Session
 from deep_tracker.api.deps import get_http_client, get_session
 from deep_tracker.config import get_settings
 from deep_tracker.db import Article, Feed
-from deep_tracker.feeds import FeedParseError, describe_error, fetch_and_store, register_feed
+from deep_tracker.feeds import (
+    FeedParseError,
+    change_feed_url,
+    describe_error,
+    fetch_and_store,
+    register_feed,
+)
 
 router = APIRouter(prefix="/feeds", tags=["feeds"])
 
@@ -55,6 +61,8 @@ class FeedUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
     fetch_interval_minutes: int | None = Field(default=None, ge=1)
     enabled: bool | None = None
+    # 変更時は新URLを取得・解析できることを確認してから付け替える
+    url: str | None = None
 
 
 class FetchOut(BaseModel):
@@ -149,14 +157,26 @@ def create_feed(body: FeedCreate, session: SessionDep, client: ClientDep) -> Fee
 
 
 @router.patch("/{feed_id}", response_model=FeedOut)
-def update_feed(feed_id: int, body: FeedUpdate, session: SessionDep) -> FeedOut:
+def update_feed(feed_id: int, body: FeedUpdate, session: SessionDep, client: ClientDep) -> FeedOut:
     feed = _get_feed(session, feed_id)
     sent = body.model_fields_set
+    new_url = _validate_url(body.url) if "url" in sent and body.url is not None else None
+    if "name" in sent and not (body.name or "").strip():
+        raise _error(422, "invalid_name", "名称を空にはできません")
+    if new_url is not None and new_url != feed.url:
+        other = session.scalar(select(Feed.id).where(Feed.url == new_url, Feed.id != feed.id))
+        if other is not None:
+            raise _error(409, ERROR_DUPLICATE_URL, "このフィードは既に登録されています")
+        try:
+            change_feed_url(session, feed, new_url, client=client)
+        except IntegrityError:
+            session.rollback()
+            raise _error(409, ERROR_DUPLICATE_URL, "このフィードは既に登録されています") from None
+        except (httpx.HTTPError, FeedParseError) as exc:
+            session.rollback()
+            raise _error(422, ERROR_NOT_A_FEED, describe_error(exc)) from exc
     if "name" in sent:
-        name = (body.name or "").strip()
-        if not name:
-            raise _error(422, "invalid_name", "名称を空にはできません")
-        feed.name = name
+        feed.name = (body.name or "").strip()
     if "fetch_interval_minutes" in sent:
         feed.fetch_interval_minutes = body.fetch_interval_minutes
     if "enabled" in sent and body.enabled is not None:
