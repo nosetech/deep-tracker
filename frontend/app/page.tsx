@@ -2,8 +2,15 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { SHELL_REFRESH_EVENT } from "@/components/AppShell";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { createPortal } from "react-dom";
+import { PREVIEW_SLOT_ID, SHELL_REFRESH_EVENT } from "@/components/AppShell";
 import { useToast } from "@/components/Toast";
 import {
   ApiErrorPanel,
@@ -11,10 +18,7 @@ import {
   LoadingSkeleton,
 } from "@/components/states";
 import { api } from "@/lib/api/client";
-import {
-  ArticlePreview,
-  type PreviewPosition,
-} from "./_components/ArticlePreview";
+import { ArticlePreview } from "./_components/ArticlePreview";
 import type {
   ArticleDetail,
   GenerationState,
@@ -25,7 +29,15 @@ import type {
 } from "@/lib/api/types";
 
 const POLL_MS = 2000;
-const PREVIEW_POS_KEY = "summary-preview-position";
+// この幅以上のときだけ、元記事を画面遷移せずプレビューする（デザインの PC 幅）
+const PREVIEW_MIN_WIDTH = 1180;
+const PREVIEW_QUERY = `(min-width: ${PREVIEW_MIN_WIDTH}px)`;
+
+function subscribeWide(cb: () => void) {
+  const mq = window.matchMedia(PREVIEW_QUERY);
+  mq.addEventListener("change", cb);
+  return () => mq.removeEventListener("change", cb);
+}
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 const STEP_LABELS = [
   "対象期間の記事を収集",
@@ -102,6 +114,23 @@ function refreshShell() {
   window.dispatchEvent(new Event(SHELL_REFRESH_EVENT));
 }
 
+// プレビューで本文が狭くなっても、選んだ元記事が見える位置に寄せる
+function revealSource(id: number) {
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      const main = document.querySelector<HTMLElement>(".main");
+      const row = main?.querySelector<HTMLElement>(`[data-src-id="${id}"]`);
+      if (!main || !row) return;
+      const rel =
+        row.getBoundingClientRect().top - main.getBoundingClientRect().top;
+      const visible = main.clientHeight - 24;
+      if (rel < 16 || rel + row.offsetHeight > visible) {
+        main.scrollTop += rel - Math.max(16, Math.round(visible * 0.35));
+      }
+    }),
+  );
+}
+
 function scrollTop() {
   document.querySelector(".main")?.scrollTo(0, 0);
 }
@@ -138,7 +167,12 @@ export default function SummaryPage() {
   const [noFeeds, setNoFeeds] = useState(false);
   // 画面遷移せずプレビュー表示している元記事
   const [previewId, setPreviewId] = useState<number | null>(null);
-  const [previewPos, setPreviewPos] = useState<PreviewPosition>("right");
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  const wide = useSyncExternalStore(
+    subscribeWide,
+    () => window.matchMedia(PREVIEW_QUERY).matches,
+    () => false,
+  );
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -176,9 +210,8 @@ export default function SummaryPage() {
   );
 
   useEffect(() => {
-    const saved = localStorage.getItem(PREVIEW_POS_KEY);
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (saved === "right" || saved === "bottom") setPreviewPos(saved);
+    setSlot(document.getElementById(PREVIEW_SLOT_ID));
   }, []);
 
   useEffect(() => {
@@ -259,12 +292,16 @@ export default function SummaryPage() {
   };
 
   const openSource = (s: SummarySource) => {
+    // 狭い画面ではプレビューせず、記事画面へ遷移する
+    if (!wide) {
+      if (!s.is_read) {
+        void api.setArticleRead(s.id, true).then(refreshShell, () => {});
+      }
+      router.push(`/articles/${s.id}?from=summary`);
+      return;
+    }
     setPreviewId((cur) => (cur === s.id ? null : s.id));
-  };
-
-  const changePreviewPos = (p: PreviewPosition) => {
-    setPreviewPos(p);
-    localStorage.setItem(PREVIEW_POS_KEY, p);
+    revealSource(s.id);
   };
 
   // 取得できた元記事を既読にし、サマリ内の表示にも反映する
@@ -297,6 +334,7 @@ export default function SummaryPage() {
 
   // 表示中のサマリが引用している元記事だけをプレビューする
   const previewOpen =
+    wide &&
     previewId !== null &&
     !!detail?.topics.some((t) => t.sources.some((s) => s.id === previewId));
 
@@ -317,220 +355,217 @@ export default function SummaryPage() {
   );
 
   return (
-    <div className={`sum-page${previewOpen ? ` has-pv pv-${previewPos}` : ""}`}>
-      <div className="sum-wrap">
-        <div className="sum-main">
-          <div className="sum-head">
-            <h1 className="page-title sum-title">サマリ</h1>
-            {generateButton("sum-gen-btn")}
-          </div>
-          {generateButton("sum-gen-btn-m")}
-
-          {loadError && (
-            <ApiErrorPanel
-              onRetry={() => {
-                setLoaded(false);
-                void load(selected);
-              }}
-            />
-          )}
-          {!loaded && <LoadingSkeleton />}
-
-          {running && generation && (
-            <div role="status" className="sum-progress">
-              <div className="sum-progress-title">
-                <span className="skel-spin" aria-hidden="true" />
-                サマリを生成しています…
-              </div>
-              <p>
-                {generation.period_start
-                  ? `${new Date(generation.period_start).getMonth() + 1}月${new Date(generation.period_start).getDate()}日以降の`
-                  : ""}
-                記事{" "}
-                {generation.article_count != null
-                  ? `${generation.article_count}件を`
-                  : "を"}
-                要約中です。数分かかる場合があります。画面を離れても処理は続きます。
-              </p>
-              <ol>
-                {STEP_LABELS.map((label, i) => {
-                  const st =
-                    i < generation.step - 1
-                      ? "done"
-                      : i === generation.step - 1
-                        ? "active"
-                        : "todo";
-                  return (
-                    <li key={label} className={`sum-step is-${st}`}>
-                      <span className="sum-step-mark">
-                        {st === "done" ? "✓" : ""}
-                      </span>
-                      {label}
-                      {st === "active" ? "…" : ""}
-                    </li>
-                  );
-                })}
-              </ol>
-            </div>
-          )}
-
-          {failed && generation && (
-            <ErrorPanel
-              compact
-              title="サマリの生成に失敗しました"
-              message={failureMessage(generation)}
-              detail={`${generation.rate_limited ? "rate_limit_exceeded" : "failed"} · job #${generation.job_id}`}
-              onRetry={() => void generate()}
-            >
-              <button
-                type="button"
-                className="err-panel-close"
-                onClick={dismiss}
-              >
-                閉じる
-              </button>
-            </ErrorPanel>
-          )}
-
-          {noSummary && (
-            <div className="sum-empty">
-              <div className="sum-empty-title">まだサマリがありません</div>
-              <p>
-                {noFeeds
-                  ? "購読フィードを登録すると、定期実行のタイミングで過去の記事をもとにサマリが作成されます。"
-                  : "次回の定期実行を待つか、今すぐ生成できます。"}
-              </p>
-              <button
-                type="button"
-                className="sum-empty-btn"
-                disabled={!noFeeds && busy}
-                onClick={() =>
-                  noFeeds ? router.push("/feeds") : void generate()
-                }
-              >
-                {noFeeds ? "フィードを登録する" : "今すぐサマリを生成"}
-              </button>
-            </div>
-          )}
-
-          {detail && (
-            <article>
-              {detail.is_latest && detail.new_since.count > 0 && (
-                <Link href="/articles" className="sum-since">
-                  <span className="sum-since-dot" aria-hidden="true" />
-                  <span className="sum-since-text">
-                    このサマリ以降の新着{" "}
-                    <strong>{detail.new_since.count}件</strong>
-                    （未読 {detail.new_since.unread_count}件）
-                  </span>
-                  <span className="sum-since-go">記事一覧へ →</span>
-                </Link>
-              )}
-              <div className="sum-tags">
-                <span className="sum-tag">{detail.kind}</span>
-                {detail.is_latest && (
-                  <span className="sum-tag sum-tag-latest">最新</span>
-                )}
-                {!detail.is_latest && (
-                  <button
-                    type="button"
-                    className="sum-back-latest"
-                    onClick={selectLatest}
-                  >
-                    最新のサマリに戻る
-                  </button>
-                )}
-              </div>
-              <h2 className="sum-period">{periodLabel(detail)}</h2>
-              <div className="sum-stats">
-                <span>生成 {shortDate(detail.created_at)}</span>
-                <span>対象記事 {detail.article_count}件</span>
-                <span>{detail.topic_count}トピック</span>
-              </div>
-              <p className="sum-lead">{detail.overview}</p>
-
-              {detail.topics.map((t, i) => (
-                <section key={i} className="sum-topic">
-                  <div className="sum-topic-head">
-                    <span className="sum-topic-num">{p2(i + 1)}</span>
-                    <h3>{t.title}</h3>
-                  </div>
-                  {t.summary
-                    .split(/\n+/)
-                    .filter(Boolean)
-                    .map((para, j) => (
-                      <p key={j} className="sum-para">
-                        {para}
-                      </p>
-                    ))}
-                  <div className="sum-sources">
-                    <div className="sum-sources-head">
-                      元記事 {t.sources.length}件
-                    </div>
-                    {t.sources.map((s) => (
-                      <div
-                        key={s.id}
-                        className={`sum-src${previewOpen && previewId === s.id ? " is-on" : ""}`}
-                      >
-                        <button
-                          type="button"
-                          className={`sum-src-open${s.is_read ? "" : " is-unread"}`}
-                          aria-expanded={previewOpen && previewId === s.id}
-                          onClick={() => openSource(s)}
-                        >
-                          <span className="sum-src-dot" aria-hidden="true" />
-                          <span className="sum-src-body">
-                            <span className="sum-src-title">{s.title}</span>
-                            <span className="sum-src-meta">
-                              {s.feed_name}
-                              {s.published_at
-                                ? ` · ${shortDate(s.published_at)}`
-                                : ""}
-                            </span>
-                          </span>
-                        </button>
-                        {s.url && (
-                          <a
-                            className="sum-src-ext"
-                            href={s.url}
-                            target="_blank"
-                            rel="noopener"
-                            aria-label="元記事を新しいタブで開く"
-                            title="元記事を開く"
-                          >
-                            <svg
-                              width="15"
-                              height="15"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.8"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6" />
-                            </svg>
-                          </a>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </article>
-          )}
+    <div className={`sum-page${previewOpen ? " has-pv" : ""}`}>
+      <div className="sum-main">
+        <div className="sum-head">
+          <h1 className="page-title sum-title">サマリ</h1>
+          {generateButton("sum-gen-btn")}
         </div>
+        {generateButton("sum-gen-btn-m")}
 
-        {previewOpen && previewId !== null && (
-          <ArticlePreview
-            id={previewId}
-            position={previewPos}
-            onPositionChange={changePreviewPos}
-            onClose={() => setPreviewId(null)}
-            onLoaded={markSourceRead}
+        {loadError && (
+          <ApiErrorPanel
+            onRetry={() => {
+              setLoaded(false);
+              void load(selected);
+            }}
           />
         )}
+        {!loaded && <LoadingSkeleton />}
+
+        {running && generation && (
+          <div role="status" className="sum-progress">
+            <div className="sum-progress-title">
+              <span className="skel-spin" aria-hidden="true" />
+              サマリを生成しています…
+            </div>
+            <p>
+              {generation.period_start
+                ? `${new Date(generation.period_start).getMonth() + 1}月${new Date(generation.period_start).getDate()}日以降の`
+                : ""}
+              記事{" "}
+              {generation.article_count != null
+                ? `${generation.article_count}件を`
+                : "を"}
+              要約中です。数分かかる場合があります。画面を離れても処理は続きます。
+            </p>
+            <ol>
+              {STEP_LABELS.map((label, i) => {
+                const st =
+                  i < generation.step - 1
+                    ? "done"
+                    : i === generation.step - 1
+                      ? "active"
+                      : "todo";
+                return (
+                  <li key={label} className={`sum-step is-${st}`}>
+                    <span className="sum-step-mark">
+                      {st === "done" ? "✓" : ""}
+                    </span>
+                    {label}
+                    {st === "active" ? "…" : ""}
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        )}
+
+        {failed && generation && (
+          <ErrorPanel
+            compact
+            title="サマリの生成に失敗しました"
+            message={failureMessage(generation)}
+            detail={`${generation.rate_limited ? "rate_limit_exceeded" : "failed"} · job #${generation.job_id}`}
+            onRetry={() => void generate()}
+          >
+            <button type="button" className="err-panel-close" onClick={dismiss}>
+              閉じる
+            </button>
+          </ErrorPanel>
+        )}
+
+        {noSummary && (
+          <div className="sum-empty">
+            <div className="sum-empty-title">まだサマリがありません</div>
+            <p>
+              {noFeeds
+                ? "購読フィードを登録すると、定期実行のタイミングで過去の記事をもとにサマリが作成されます。"
+                : "次回の定期実行を待つか、今すぐ生成できます。"}
+            </p>
+            <button
+              type="button"
+              className="sum-empty-btn"
+              disabled={!noFeeds && busy}
+              onClick={() =>
+                noFeeds ? router.push("/feeds") : void generate()
+              }
+            >
+              {noFeeds ? "フィードを登録する" : "今すぐサマリを生成"}
+            </button>
+          </div>
+        )}
+
+        {detail && (
+          <article>
+            {detail.is_latest && detail.new_since.count > 0 && (
+              <Link href="/articles" className="sum-since">
+                <span className="sum-since-dot" aria-hidden="true" />
+                <span className="sum-since-text">
+                  このサマリ以降の新着{" "}
+                  <strong>{detail.new_since.count}件</strong>
+                  （未読 {detail.new_since.unread_count}件）
+                </span>
+                <span className="sum-since-go">記事一覧へ →</span>
+              </Link>
+            )}
+            <div className="sum-tags">
+              <span className="sum-tag">{detail.kind}</span>
+              {detail.is_latest && (
+                <span className="sum-tag sum-tag-latest">最新</span>
+              )}
+              {!detail.is_latest && (
+                <button
+                  type="button"
+                  className="sum-back-latest"
+                  onClick={selectLatest}
+                >
+                  最新のサマリに戻る
+                </button>
+              )}
+            </div>
+            <h2 className="sum-period">{periodLabel(detail)}</h2>
+            <div className="sum-stats">
+              <span>生成 {shortDate(detail.created_at)}</span>
+              <span>対象記事 {detail.article_count}件</span>
+              <span>{detail.topic_count}トピック</span>
+            </div>
+            <p className="sum-lead">{detail.overview}</p>
+
+            {detail.topics.map((t, i) => (
+              <section key={i} className="sum-topic">
+                <div className="sum-topic-head">
+                  <span className="sum-topic-num">{p2(i + 1)}</span>
+                  <h3>{t.title}</h3>
+                </div>
+                {t.summary
+                  .split(/\n+/)
+                  .filter(Boolean)
+                  .map((para, j) => (
+                    <p key={j} className="sum-para">
+                      {para}
+                    </p>
+                  ))}
+                <div className="sum-sources">
+                  <div className="sum-sources-head">
+                    元記事 {t.sources.length}件
+                  </div>
+                  {t.sources.map((s) => (
+                    <div
+                      key={s.id}
+                      className={`sum-src${previewOpen && previewId === s.id ? " is-on" : ""}`}
+                    >
+                      <button
+                        type="button"
+                        className={`sum-src-open${s.is_read ? "" : " is-unread"}`}
+                        data-src-id={s.id}
+                        aria-expanded={previewOpen && previewId === s.id}
+                        onClick={() => openSource(s)}
+                      >
+                        <span className="sum-src-dot" aria-hidden="true" />
+                        <span className="sum-src-body">
+                          <span className="sum-src-title">{s.title}</span>
+                          <span className="sum-src-meta">
+                            {s.feed_name}
+                            {s.published_at
+                              ? ` · ${shortDate(s.published_at)}`
+                              : ""}
+                          </span>
+                        </span>
+                      </button>
+                      {s.url && (
+                        <a
+                          className="sum-src-ext"
+                          href={s.url}
+                          target="_blank"
+                          rel="noopener"
+                          aria-label="元記事を新しいタブで開く"
+                          title="元記事を開く"
+                        >
+                          <svg
+                            width="15"
+                            height="15"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6" />
+                          </svg>
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </article>
+        )}
       </div>
+
+      {previewOpen &&
+        previewId !== null &&
+        slot &&
+        createPortal(
+          <ArticlePreview
+            id={previewId}
+            onClose={() => setPreviewId(null)}
+            onLoaded={markSourceRead}
+          />,
+          slot,
+        )}
 
       {list.length > 0 && (
         <aside className="sum-side">

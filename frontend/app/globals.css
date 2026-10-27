@@ -2045,20 +2045,6 @@ a:hover {
   border-radius: 6px;
 }
 
-.sum-wrap {
-  flex: 1 1 560px;
-  min-width: 0;
-  max-width: 760px;
-  display: flex;
-  flex-direction: column;
-  gap: 28px;
-}
-
-.sum-wrap > .sum-main {
-  flex: 1 1 auto;
-  width: 100%;
-}
-
 .sum-src {
   margin: 0 -10px;
   padding-left: 10px;
@@ -2074,15 +2060,40 @@ a:hover {
   background: var(--surface2);
 }
 
+.main-row {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+}
+
+.main-row > .main {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.pv-slot:empty {
+  display: none;
+}
+
+.pv-slot {
+  flex: 0 0 420px;
+  width: 420px;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+  border-left: 1px solid var(--line);
+  background: var(--surface);
+}
+
 .pv {
-  width: 100%;
-  max-height: 560px;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--line);
-  border-radius: 10px;
   background: var(--surface);
-  overflow: hidden;
 }
 
 .pv-head {
@@ -2100,34 +2111,6 @@ a:hover {
   font-size: 13px;
   font-weight: 700;
   color: var(--tx2);
-}
-
-.pv-seg {
-  display: inline-flex;
-  padding: 2px;
-  gap: 2px;
-  background: var(--surface2);
-  border-radius: 7px;
-  border: 1px solid var(--line);
-  height: 32px;
-}
-
-.pv-seg-btn {
-  width: 32px;
-  border: 0;
-  border-radius: 5px;
-  padding: 0;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  background: transparent;
-  color: var(--tx3);
-}
-
-.pv-seg-btn[aria-pressed="true"] {
-  background: var(--surface);
-  color: var(--tx);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
 }
 
 .pv-close {
@@ -2267,37 +2250,9 @@ a:hover {
   text-wrap: pretty;
 }
 
-/* 1180px以上かつ「右」の間だけ、本文の右隣に置く（サマリ一覧は畳む） */
-@media (min-width: 1180px) {
-  .sum-page.has-pv.pv-right .sum-wrap {
-    max-width: none;
-    flex-direction: row;
-    align-items: flex-start;
-    gap: 32px;
-  }
-
-  .sum-page.has-pv.pv-right .sum-wrap > .sum-main {
-    max-width: 760px;
-  }
-
-  .sum-page.has-pv.pv-right .pv {
-    flex: 0 0 420px;
-    width: 420px;
-    max-height: calc(100vh - 48px);
-    position: sticky;
-    top: 0;
-  }
-
-  .sum-page.has-pv.pv-right .sum-side {
-    display: none;
-  }
-}
-
-/* 1180px未満は下側のみ。切り替えは出さない */
-@media (max-width: 1179px) {
-  .pv-seg {
-    display: none;
-  }
+/* プレビュー表示中はサマリ一覧を畳み、本文の幅を確保する */
+.sum-page.has-pv .sum-side {
+  display: none;
 }
 
 @media (max-width: 719px) {
