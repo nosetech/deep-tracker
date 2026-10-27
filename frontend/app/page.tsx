@@ -11,7 +11,12 @@ import {
   LoadingSkeleton,
 } from "@/components/states";
 import { api } from "@/lib/api/client";
+import {
+  ArticlePreview,
+  type PreviewPosition,
+} from "./_components/ArticlePreview";
 import type {
+  ArticleDetail,
   GenerationState,
   SummaryConfig,
   SummaryDetail,
@@ -20,6 +25,7 @@ import type {
 } from "@/lib/api/types";
 
 const POLL_MS = 2000;
+const PREVIEW_POS_KEY = "summary-preview-position";
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 const STEP_LABELS = [
   "対象期間の記事を収集",
@@ -130,6 +136,9 @@ export default function SummaryPage() {
   // 設定取得前は null（誤った周期を一瞬出さない）
   const [schedule, setSchedule] = useState<SummaryConfig | null>(null);
   const [noFeeds, setNoFeeds] = useState(false);
+  // 画面遷移せずプレビュー表示している元記事
+  const [previewId, setPreviewId] = useState<number | null>(null);
+  const [previewPos, setPreviewPos] = useState<PreviewPosition>("right");
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -165,6 +174,12 @@ export default function SummaryPage() {
     },
     [dismissed],
   );
+
+  useEffect(() => {
+    const saved = localStorage.getItem(PREVIEW_POS_KEY);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (saved === "right" || saved === "bottom") setPreviewPos(saved);
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -228,6 +243,7 @@ export default function SummaryPage() {
 
   const select = (id: number) => {
     setSelected(id);
+    setPreviewId(null);
     scrollTop();
     void api
       .getSummary(id)
@@ -243,16 +259,46 @@ export default function SummaryPage() {
   };
 
   const openSource = (s: SummarySource) => {
-    if (!s.is_read) {
-      void api.setArticleRead(s.id, true).then(refreshShell, () => {});
-    }
-    router.push(`/articles/${s.id}?from=summary`);
+    setPreviewId((cur) => (cur === s.id ? null : s.id));
+  };
+
+  const changePreviewPos = (p: PreviewPosition) => {
+    setPreviewPos(p);
+    localStorage.setItem(PREVIEW_POS_KEY, p);
+  };
+
+  // 取得できた元記事を既読にし、サマリ内の表示にも反映する
+  const markSourceRead = (a: ArticleDetail) => {
+    if (a.is_read) return;
+    void api.setArticleRead(a.id, true).then(
+      () => {
+        refreshShell();
+        setDetail(
+          (d) =>
+            d && {
+              ...d,
+              topics: d.topics.map((t) => ({
+                ...t,
+                sources: t.sources.map((s) =>
+                  s.id === a.id ? { ...s, is_read: true } : s,
+                ),
+              })),
+            },
+        );
+      },
+      () => {},
+    );
   };
 
   const dismiss = () => {
     setDismissed(generation?.job_id ?? null);
     setGeneration({ ...generation!, state: "idle" });
   };
+
+  // 表示中のサマリが引用している元記事だけをプレビューする
+  const previewOpen =
+    previewId !== null &&
+    !!detail?.topics.some((t) => t.sources.some((s) => s.id === previewId));
 
   const failed = generation?.state === "failed";
   const busy = running || starting;
@@ -271,198 +317,218 @@ export default function SummaryPage() {
   );
 
   return (
-    <div className="sum-page">
-      <div className="sum-main">
-        <div className="sum-head">
-          <h1 className="page-title sum-title">サマリ</h1>
-          {generateButton("sum-gen-btn")}
-        </div>
-        {generateButton("sum-gen-btn-m")}
-
-        {loadError && (
-          <ApiErrorPanel
-            onRetry={() => {
-              setLoaded(false);
-              void load(selected);
-            }}
-          />
-        )}
-        {!loaded && <LoadingSkeleton />}
-
-        {running && generation && (
-          <div role="status" className="sum-progress">
-            <div className="sum-progress-title">
-              <span className="skel-spin" aria-hidden="true" />
-              サマリを生成しています…
-            </div>
-            <p>
-              {generation.period_start
-                ? `${new Date(generation.period_start).getMonth() + 1}月${new Date(generation.period_start).getDate()}日以降の`
-                : ""}
-              記事{" "}
-              {generation.article_count != null
-                ? `${generation.article_count}件を`
-                : "を"}
-              要約中です。数分かかる場合があります。画面を離れても処理は続きます。
-            </p>
-            <ol>
-              {STEP_LABELS.map((label, i) => {
-                const st =
-                  i < generation.step - 1
-                    ? "done"
-                    : i === generation.step - 1
-                      ? "active"
-                      : "todo";
-                return (
-                  <li key={label} className={`sum-step is-${st}`}>
-                    <span className="sum-step-mark">
-                      {st === "done" ? "✓" : ""}
-                    </span>
-                    {label}
-                    {st === "active" ? "…" : ""}
-                  </li>
-                );
-              })}
-            </ol>
+    <div className={`sum-page${previewOpen ? ` has-pv pv-${previewPos}` : ""}`}>
+      <div className="sum-wrap">
+        <div className="sum-main">
+          <div className="sum-head">
+            <h1 className="page-title sum-title">サマリ</h1>
+            {generateButton("sum-gen-btn")}
           </div>
-        )}
+          {generateButton("sum-gen-btn-m")}
 
-        {failed && generation && (
-          <ErrorPanel
-            compact
-            title="サマリの生成に失敗しました"
-            message={failureMessage(generation)}
-            detail={`${generation.rate_limited ? "rate_limit_exceeded" : "failed"} · job #${generation.job_id}`}
-            onRetry={() => void generate()}
-          >
-            <button type="button" className="err-panel-close" onClick={dismiss}>
-              閉じる
-            </button>
-          </ErrorPanel>
-        )}
+          {loadError && (
+            <ApiErrorPanel
+              onRetry={() => {
+                setLoaded(false);
+                void load(selected);
+              }}
+            />
+          )}
+          {!loaded && <LoadingSkeleton />}
 
-        {noSummary && (
-          <div className="sum-empty">
-            <div className="sum-empty-title">まだサマリがありません</div>
-            <p>
-              {noFeeds
-                ? "購読フィードを登録すると、定期実行のタイミングで過去の記事をもとにサマリが作成されます。"
-                : "次回の定期実行を待つか、今すぐ生成できます。"}
-            </p>
-            <button
-              type="button"
-              className="sum-empty-btn"
-              disabled={!noFeeds && busy}
-              onClick={() =>
-                noFeeds ? router.push("/feeds") : void generate()
-              }
+          {running && generation && (
+            <div role="status" className="sum-progress">
+              <div className="sum-progress-title">
+                <span className="skel-spin" aria-hidden="true" />
+                サマリを生成しています…
+              </div>
+              <p>
+                {generation.period_start
+                  ? `${new Date(generation.period_start).getMonth() + 1}月${new Date(generation.period_start).getDate()}日以降の`
+                  : ""}
+                記事{" "}
+                {generation.article_count != null
+                  ? `${generation.article_count}件を`
+                  : "を"}
+                要約中です。数分かかる場合があります。画面を離れても処理は続きます。
+              </p>
+              <ol>
+                {STEP_LABELS.map((label, i) => {
+                  const st =
+                    i < generation.step - 1
+                      ? "done"
+                      : i === generation.step - 1
+                        ? "active"
+                        : "todo";
+                  return (
+                    <li key={label} className={`sum-step is-${st}`}>
+                      <span className="sum-step-mark">
+                        {st === "done" ? "✓" : ""}
+                      </span>
+                      {label}
+                      {st === "active" ? "…" : ""}
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+          )}
+
+          {failed && generation && (
+            <ErrorPanel
+              compact
+              title="サマリの生成に失敗しました"
+              message={failureMessage(generation)}
+              detail={`${generation.rate_limited ? "rate_limit_exceeded" : "failed"} · job #${generation.job_id}`}
+              onRetry={() => void generate()}
             >
-              {noFeeds ? "フィードを登録する" : "今すぐサマリを生成"}
-            </button>
-          </div>
-        )}
+              <button
+                type="button"
+                className="err-panel-close"
+                onClick={dismiss}
+              >
+                閉じる
+              </button>
+            </ErrorPanel>
+          )}
 
-        {detail && (
-          <article>
-            {detail.is_latest && detail.new_since.count > 0 && (
-              <Link href="/articles" className="sum-since">
-                <span className="sum-since-dot" aria-hidden="true" />
-                <span className="sum-since-text">
-                  このサマリ以降の新着{" "}
-                  <strong>{detail.new_since.count}件</strong>
-                  （未読 {detail.new_since.unread_count}件）
-                </span>
-                <span className="sum-since-go">記事一覧へ →</span>
-              </Link>
-            )}
-            <div className="sum-tags">
-              <span className="sum-tag">{detail.kind}</span>
-              {detail.is_latest && (
-                <span className="sum-tag sum-tag-latest">最新</span>
-              )}
-              {!detail.is_latest && (
-                <button
-                  type="button"
-                  className="sum-back-latest"
-                  onClick={selectLatest}
-                >
-                  最新のサマリに戻る
-                </button>
-              )}
+          {noSummary && (
+            <div className="sum-empty">
+              <div className="sum-empty-title">まだサマリがありません</div>
+              <p>
+                {noFeeds
+                  ? "購読フィードを登録すると、定期実行のタイミングで過去の記事をもとにサマリが作成されます。"
+                  : "次回の定期実行を待つか、今すぐ生成できます。"}
+              </p>
+              <button
+                type="button"
+                className="sum-empty-btn"
+                disabled={!noFeeds && busy}
+                onClick={() =>
+                  noFeeds ? router.push("/feeds") : void generate()
+                }
+              >
+                {noFeeds ? "フィードを登録する" : "今すぐサマリを生成"}
+              </button>
             </div>
-            <h2 className="sum-period">{periodLabel(detail)}</h2>
-            <div className="sum-stats">
-              <span>生成 {shortDate(detail.created_at)}</span>
-              <span>対象記事 {detail.article_count}件</span>
-              <span>{detail.topic_count}トピック</span>
-            </div>
-            <p className="sum-lead">{detail.overview}</p>
+          )}
 
-            {detail.topics.map((t, i) => (
-              <section key={i} className="sum-topic">
-                <div className="sum-topic-head">
-                  <span className="sum-topic-num">{p2(i + 1)}</span>
-                  <h3>{t.title}</h3>
-                </div>
-                {t.summary
-                  .split(/\n+/)
-                  .filter(Boolean)
-                  .map((para, j) => (
-                    <p key={j} className="sum-para">
-                      {para}
-                    </p>
-                  ))}
-                <div className="sum-sources">
-                  <div className="sum-sources-head">
-                    元記事 {t.sources.length}件
+          {detail && (
+            <article>
+              {detail.is_latest && detail.new_since.count > 0 && (
+                <Link href="/articles" className="sum-since">
+                  <span className="sum-since-dot" aria-hidden="true" />
+                  <span className="sum-since-text">
+                    このサマリ以降の新着{" "}
+                    <strong>{detail.new_since.count}件</strong>
+                    （未読 {detail.new_since.unread_count}件）
+                  </span>
+                  <span className="sum-since-go">記事一覧へ →</span>
+                </Link>
+              )}
+              <div className="sum-tags">
+                <span className="sum-tag">{detail.kind}</span>
+                {detail.is_latest && (
+                  <span className="sum-tag sum-tag-latest">最新</span>
+                )}
+                {!detail.is_latest && (
+                  <button
+                    type="button"
+                    className="sum-back-latest"
+                    onClick={selectLatest}
+                  >
+                    最新のサマリに戻る
+                  </button>
+                )}
+              </div>
+              <h2 className="sum-period">{periodLabel(detail)}</h2>
+              <div className="sum-stats">
+                <span>生成 {shortDate(detail.created_at)}</span>
+                <span>対象記事 {detail.article_count}件</span>
+                <span>{detail.topic_count}トピック</span>
+              </div>
+              <p className="sum-lead">{detail.overview}</p>
+
+              {detail.topics.map((t, i) => (
+                <section key={i} className="sum-topic">
+                  <div className="sum-topic-head">
+                    <span className="sum-topic-num">{p2(i + 1)}</span>
+                    <h3>{t.title}</h3>
                   </div>
-                  {t.sources.map((s) => (
-                    <div key={s.id} className="sum-src">
-                      <button
-                        type="button"
-                        className={`sum-src-open${s.is_read ? "" : " is-unread"}`}
-                        onClick={() => openSource(s)}
-                      >
-                        <span className="sum-src-dot" aria-hidden="true" />
-                        <span className="sum-src-body">
-                          <span className="sum-src-title">{s.title}</span>
-                          <span className="sum-src-meta">
-                            {s.feed_name}
-                            {s.published_at
-                              ? ` · ${shortDate(s.published_at)}`
-                              : ""}
-                          </span>
-                        </span>
-                      </button>
-                      {s.url && (
-                        <a
-                          className="sum-src-ext"
-                          href={s.url}
-                          target="_blank"
-                          rel="noopener"
-                          aria-label="元記事を新しいタブで開く"
-                          title="元記事を開く"
-                        >
-                          <svg
-                            width="15"
-                            height="15"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.8"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6" />
-                          </svg>
-                        </a>
-                      )}
+                  {t.summary
+                    .split(/\n+/)
+                    .filter(Boolean)
+                    .map((para, j) => (
+                      <p key={j} className="sum-para">
+                        {para}
+                      </p>
+                    ))}
+                  <div className="sum-sources">
+                    <div className="sum-sources-head">
+                      元記事 {t.sources.length}件
                     </div>
-                  ))}
-                </div>
-              </section>
-            ))}
-          </article>
+                    {t.sources.map((s) => (
+                      <div
+                        key={s.id}
+                        className={`sum-src${previewOpen && previewId === s.id ? " is-on" : ""}`}
+                      >
+                        <button
+                          type="button"
+                          className={`sum-src-open${s.is_read ? "" : " is-unread"}`}
+                          aria-expanded={previewOpen && previewId === s.id}
+                          onClick={() => openSource(s)}
+                        >
+                          <span className="sum-src-dot" aria-hidden="true" />
+                          <span className="sum-src-body">
+                            <span className="sum-src-title">{s.title}</span>
+                            <span className="sum-src-meta">
+                              {s.feed_name}
+                              {s.published_at
+                                ? ` · ${shortDate(s.published_at)}`
+                                : ""}
+                            </span>
+                          </span>
+                        </button>
+                        {s.url && (
+                          <a
+                            className="sum-src-ext"
+                            href={s.url}
+                            target="_blank"
+                            rel="noopener"
+                            aria-label="元記事を新しいタブで開く"
+                            title="元記事を開く"
+                          >
+                            <svg
+                              width="15"
+                              height="15"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6" />
+                            </svg>
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </article>
+          )}
+        </div>
+
+        {previewOpen && previewId !== null && (
+          <ArticlePreview
+            id={previewId}
+            position={previewPos}
+            onPositionChange={changePreviewPos}
+            onClose={() => setPreviewId(null)}
+            onLoaded={markSourceRead}
+          />
         )}
       </div>
 
