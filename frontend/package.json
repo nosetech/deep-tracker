@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start -H ${FRONTEND_HOST:-127.0.0.1} -p ${FRONTEND_PORT:-3700}",
     "lint": "eslint",
+    "test": "node --test",
     "typecheck": "next typegen && tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

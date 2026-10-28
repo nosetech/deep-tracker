@@ -37,7 +37,7 @@ cp config/config.yaml.example config/config.yaml
 | `feed.fetch_interval_minutes` | フィード取得の既定間隔（分） |
 | `retention.days` | 記事の保存期間（日） |
 | `slack.enabled` / `slack.webhook_url` | Slack通知の有効化とWebhook URL |
-| `frontend.host` / `frontend.port` | 画面の待ち受け。既定は `127.0.0.1:3700` |
+| `frontend.port` | 画面の待ち受けポート。既定は `3700`（待ち受けアドレスは環境変数 `LAN_IP` / `TAILSCALE_IP`） |
 
 ## 起動・停止
 
@@ -46,18 +46,18 @@ scripts/start.sh   # backend と frontend をバックグラウンドで起動�
 scripts/stop.sh    # 両方を停止
 ```
 
-backend は `127.0.0.1:8700`、frontend は `config.yaml` の `frontend.host` / `frontend.port` で待ち受ける。ログは `logs/` に出る。
+backend は `127.0.0.1:8700`、frontend は既定で `127.0.0.1`、ポートは `config.yaml` の `frontend.port` で待ち受ける。ログは `logs/` に出る。
 
 ブラウザで <http://localhost:3700> を開く（`frontend.port` を変えた場合はそのポート）。
 
-LAN内の別デバイスから開く場合は `frontend.host` を `0.0.0.0` にする。認証がないため、リスクと手順を [docs/setup.md](docs/setup.md) で確認すること。
+LAN内やtailnetの別デバイスから開く場合は、環境変数 `LAN_IP` または `TAILSCALE_IP`（どちらか一方）に待ち受けさせるIPを指定して起動する（例: `LAN_IP=192.168.0.10 scripts/start.sh`）。`0.0.0.0` では待ち受けない。認証がないため、リスクと手順を [docs/setup.md](docs/setup.md) で確認すること。
 
 ## 使い方
 
 1. **フィードを登録する**: 左のメニューの「購読フィード」でRSSのURLを追加する。登録後すぐ取得され、以降は設定した間隔で取得される
 2. **記事を読む**: 「記事一覧」で記事を閲覧する。フィードや未読のみで絞り込め、キーワードで検索できる。記事ごとに既読/未読を切り替えられ、フィード単位でまとめて既読にもできる
 3. **サマリを見る**: 「サマリ」で最新のサマリと過去のサマリを確認する。「今すぐサマリを生成」で任意のタイミングで生成もできる（この場合Slackには通知されない）
-4. **Slackに通知する**: `slack.enabled: true` と `slack.webhook_url` を設定すると、定期実行で生成されたサマリの結果（失敗も）が通知される。画面の「今すぐサマリを生成」では通知されない。通知内のリンクは `slack.base_url`（未指定なら `frontend.host` / `frontend.port`）から作られる
+4. **Slackに通知する**: `slack.enabled: true` と `slack.webhook_url` を設定すると、定期実行で生成されたサマリの結果（失敗も）が通知される。画面の「今すぐサマリを生成」では通知されない。通知内のリンクは `slack.base_url`（未指定なら `LAN_IP` / `TAILSCALE_IP`、なければ `localhost` と `frontend.port`）から作られる
 
 ### 定期実行
 

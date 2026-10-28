@@ -2,7 +2,7 @@
 
 ## A. 画面の起動とLAN公開
 
-frontend の待ち受けは `config/config.yaml` の `frontend.host` / `frontend.port` で決まる。
+frontend の待ち受けアドレスは環境変数 `LAN_IP` / `TAILSCALE_IP`、ポートは `config/config.yaml` の `frontend.port` で決まる（producer-desk と同じ方式）。
 バックエンドは常に `127.0.0.1` で待ち受け、LAN公開の対象にならない（ブラウザは frontend の `/api/*` 中継経由でアクセスする）。
 
 ```bash
@@ -12,22 +12,28 @@ scripts/start.sh               # backend と frontend をバックグラウン�
 scripts/stop.sh                # 両方を停止（未起動でもエラーにならない）
 ```
 
-- `scripts/start.sh` は frontend が未ビルド（または `backend.port` を変えた後）なら自動で `npm run build` する。開発サーバで起動するには `FRONTEND_MODE=dev scripts/start.sh`
+- `scripts/start.sh` は frontend が未ビルドなら自動で `npm run build` する。`/api/*` の中継先（`BACKEND_URL`）は実行時に読まれるため、`backend.port` を変えてもビルドし直しは不要開発サーバで起動するには `FRONTEND_MODE=dev scripts/start.sh`
 - PID は `logs/deep-tracker.<instance>.{backend,frontend}.pid`、ログは `logs/{backend,frontend}.log` に出る。`instance` ごとにPIDが分かれるため、展開先を分ければ並行稼働できる
 - 二重起動は拒否される。異常終了でPIDファイルが残っていても、次の `scripts/start.sh` は起動できる
 
 | 設定 | 動作 |
 |---|---|
-| `frontend.host: 127.0.0.1`（既定） | このマシンからのみ閲覧できる |
-| `frontend.host: 0.0.0.0` | 同じネットワーク内の別デバイスから `http://<このマシンのIP>:<frontend.port>` で閲覧できる |
+| 環境変数 | 動作 |
+|---|---|
+| 未指定（既定） | `127.0.0.1` で待ち受け、このマシンからのみ閲覧できる |
+| `LAN_IP=<このマシンのLAN IP>` | そのIPで待ち受け、同じネットワーク内の別デバイスから `http://<IP>:<frontend.port>` で閲覧できる |
+| `TAILSCALE_IP=<このマシンのtailnet IP>` | そのIPで待ち受け、tailnet内の別デバイスから閲覧できる |
+| 両方を指定 | エラーで起動しない |
+
+`0.0.0.0`（全インターフェース）では待ち受けない。
 
 LAN公開する手順:
 
-1. `config/config.yaml` の `frontend.host` を `0.0.0.0` にする
-2. `scripts/stop.sh` → `scripts/start.sh` で再起動する（設定はホットリロードされない）
+1. `scripts/stop.sh` で停止する
+2. `LAN_IP=192.168.0.10 scripts/start.sh`（tailnet なら `TAILSCALE_IP=100.x.y.z scripts/start.sh`）で起動する。以前の `frontend.host` が `config.yaml` に残っているとエラーになるため、削除する
 3. 別デバイスのブラウザから `http://<このマシンのIP>:3700` を開く。開けない場合は macOS のファイアウォール設定を確認する
 
-> **リスク**: 本アプリに認証はない。`0.0.0.0` にすると、同じネットワークに接続できる全員が購読フィードの閲覧・追加・削除、既読操作などを行える。
+> **リスク**: 本アプリに認証はない。`LAN_IP` / `TAILSCALE_IP` を指定すると、同じネットワーク（tailnet）に接続できる全員が購読フィードの閲覧・追加・削除、既読操作などを行える。
 > 自宅などの信頼できるネットワーク内に限り、外出時は VPN 経由でアクセスすること。インターネットへ直接公開（ポート開放など）してはならない。
 
 # 定期取得バッチ
@@ -126,7 +132,7 @@ scripts/summary-job.sh install
 - 対象期間に記事が無い場合は生成しない
 - 利用制限などでAI処理が失敗した場合は、`status=failed` のサマリを記録して終了する。自動リトライはせず、次の期間まで待つ
 - 成功時は期間・トピック見出し・GUIへのリンクがSlack通知される（`slack.enabled: true` の場合）。失敗も通知されるが、`slack.notify_on_failure: false` で止められる
-- 通知内のリンクは `slack.base_url` があればそれを、なければ `frontend.host` / `frontend.port` を使う（LAN公開時は `base_url` にLANのアドレスを指定する。`frontend.host: 0.0.0.0` で未指定の場合、リンクが `localhost` になり他端末から開けないため、起動時に警告ログを出す）
+- 通知内のリンクは `slack.base_url` があればそれを、なければ `LAN_IP` / `TAILSCALE_IP`（未指定なら `localhost`）と `frontend.port` から作る。launchd 経由のジョブには `LAN_IP` / `TAILSCALE_IP` が渡らないため、LAN公開時は `base_url` にアドレスを指定する
 - 多重起動は `<db.path の親>/summary.lock` で防ぐ
 
 ログは `logs/summary.log`（1MBで5世代ローテーション）。launchd が受け取った出力は `logs/summary.launchd.log`。

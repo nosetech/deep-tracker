@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
-// ブラウザは常に Next.js 経由で /api/* にアクセスし、バックエンドへ中継する（CORS不要）
-const backendUrl = process.env.BACKEND_URL ?? "http://127.0.0.1:8700";
+// ブラウザは常に Next.js 経由で /api/* にアクセスする。バックエンドへの中継は
+// app/api/[...path]/route.ts が実行時の BACKEND_URL で行う（CORS不要）
 
 // next dev は allowedDevOrigins 以外のホスト（LAN内の別端末など）からの /_next/* を拒否し、画面が描画されなくなる
 const allowedDevOrigins = (process.env.ALLOWED_DEV_ORIGINS ?? "")
@@ -13,9 +13,6 @@ const allowedDevOrigins = (process.env.ALLOWED_DEV_ORIGINS ?? "")
 const nextConfig: NextConfig = {
   allowedDevOrigins,
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
-  async rewrites() {
-    return [{ source: "/api/:path*", destination: `${backendUrl}/api/:path*` }];
-  },
 };
 
 export default nextConfig;

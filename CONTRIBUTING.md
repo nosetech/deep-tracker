@@ -36,8 +36,8 @@ cd frontend && npm run dev
 ```
 
 動作確認: `curl http://localhost:3700/api/health` が `{"status":"ok"}` を返せば、frontend から backend への中継まで通っている。
-バックエンドの接続先を変える場合は、frontend の環境変数 `BACKEND_URL`（既定 `http://127.0.0.1:8700`）を指定する。
-backend と frontend をまとめてバックグラウンドで起動・停止するには `scripts/start.sh` / `scripts/stop.sh`（開発サーバで起動するには `FRONTEND_MODE=dev scripts/start.sh`。LAN公開は `docs/setup.md`）。
+バックエンドの接続先を変える場合は、frontend の環境変数 `BACKEND_URL`（既定 `http://127.0.0.1:8700`。実行時に読まれる）を指定する。
+backend と frontend をまとめてバックグラウンドで起動・停止するには `scripts/start.sh` / `scripts/stop.sh`（開発サーバで起動するには `FRONTEND_MODE=dev scripts/start.sh`。LAN公開は `LAN_IP` / `TAILSCALE_IP` で行う。`docs/setup.md`）。
 
 ## 動作確認用インスタンス
 

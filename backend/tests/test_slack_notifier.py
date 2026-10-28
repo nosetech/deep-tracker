@@ -8,10 +8,10 @@ from deep_tracker.notify import SlackNotifier, build_message, gui_url
 URL = "https://hooks.slack.com/services/T000/B000/SECRETTOKEN"
 
 
-def make_settings(tmp_path, enabled=True, host="127.0.0.1"):
+def make_settings(tmp_path, enabled=True):
     cfg = tmp_path / "config.yaml"
     cfg.write_text(
-        f"frontend: {{host: {host}, port: 3701}}\nslack: {{enabled: {str(enabled).lower()}, "
+        f"frontend: {{port: 3701}}\nslack: {{enabled: {str(enabled).lower()}, "
         f"webhook_url: {URL}}}\n",
         encoding="utf-8",
     )
@@ -33,7 +33,7 @@ def test_sends_message_with_link(tmp_path):
     assert n.notify("サマリ完了", "週次サマリを作成しました", path="/summaries")
     assert len(sent) == 1
     assert sent[0][0] == URL
-    assert b"http://127.0.0.1:3701/summaries" in sent[0][1]
+    assert b"http://localhost:3701/summaries" in sent[0][1]
 
 
 def test_disabled_sends_nothing(tmp_path):
@@ -98,33 +98,15 @@ def test_webhook_url_not_logged(tmp_path, caplog):
 def test_message_and_gui_url(tmp_path):
     assert build_message("t") == "*t*"
     assert build_message("t", "b", "http://x") == "*t*\nb\nhttp://x"
-    assert gui_url(make_settings(tmp_path, host="0.0.0.0")) == "http://localhost:3701/"
+    assert gui_url(make_settings(tmp_path)) == "http://localhost:3701/"
+
+
+def test_gui_url_uses_bind_ip(tmp_path, monkeypatch):
+    monkeypatch.setenv("TAILSCALE_IP", "100.64.0.1")
+    assert gui_url(make_settings(tmp_path)) == "http://100.64.0.1:3701/"
 
 
 def test_gui_url_uses_base_url(tmp_path):
     cfg = tmp_path / "config.yaml"
     cfg.write_text("slack: {base_url: 'http://nas.local:3700/'}\n", encoding="utf-8")
     assert gui_url(load_settings(cfg), "/") == "http://nas.local:3700/"
-
-
-def _warned(caplog):
-    return "slack.base_url" in caplog.text
-
-
-def test_warns_when_lan_exposed_without_base_url(tmp_path, caplog):
-    with caplog.at_level(logging.WARNING):
-        SlackNotifier(make_settings(tmp_path, host="0.0.0.0"))
-    assert _warned(caplog)
-
-
-def test_no_warning_with_base_url_or_local_host(tmp_path, caplog):
-    cfg = tmp_path / "config.yaml"
-    cfg.write_text(
-        f"frontend: {{host: 0.0.0.0}}\nslack: {{enabled: true, webhook_url: {URL}, "
-        "base_url: 'http://nas.local:3700'}\n",
-        encoding="utf-8",
-    )
-    with caplog.at_level(logging.WARNING):
-        SlackNotifier(load_settings(cfg))
-        SlackNotifier(make_settings(tmp_path))
-    assert not _warned(caplog)

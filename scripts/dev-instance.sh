@@ -77,7 +77,7 @@ cmd_start() {
     : >"$RUN_DIR/frontend.log"
 
     # 運用から継承した設定は使わない。NODE_ENV は production だと next dev が HTTP 500 になるため除外する
-    local base_env=(env -u NODE_ENV -u BACKEND_URL -u FRONTEND_HOST -u FRONTEND_PORT
+    local base_env=(env -u NODE_ENV -u BACKEND_URL -u FRONTEND_HOST -u FRONTEND_PORT -u LAN_IP -u TAILSCALE_IP
         "$MARKER_ENV=$token" DEEP_TRACKER_DEV_MODE=1 DEEP_TRACKER_CONFIG="$RUN_DIR/config.yaml")
     spawn backend "$DEPLOY_ROOT/backend" "${base_env[@]}" uv run python -m deep_tracker.main
     spawn frontend "$DEPLOY_ROOT/frontend" "${base_env[@]}" \
