@@ -10,6 +10,9 @@ import { ToastProvider } from "./Toast";
 // サマリの元記事プレビューを、main の右隣に差し込む場所
 export const PREVIEW_SLOT_ID = "preview-slot";
 
+// 記事詳細のモバイルヘッダーに、詳細画面側が「戻る」ボタンを差し込む場所
+export const MOBILE_BACK_SLOT_ID = "mobile-back-slot";
+
 export const SHELL_REFRESH_EVENT = "dt:shell-refresh";
 
 type NavKey = "summary" | "articles" | "feeds";
@@ -171,6 +174,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     };
   }, [pathname, refreshTick]);
 
+  const isDetail = /^\/articles\/.+/.test(pathname);
   const hasUnread = unread > 0;
   const hasError = errorCount > 0;
 
@@ -225,16 +229,21 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
 
         <div className="main-col">
-          <header className="mobile-header">
-            <div className="mobile-brand">
-              <BrandMark className="mobile-brand-mark" />
-              <div className="mobile-brand-text">
-                <div className="mobile-brand-name">Deep Tracker</div>
-                {version && (
-                  <div className="mobile-brand-version">
-                    v{version.replace(/^v/, "")}
-                  </div>
-                )}
+          <header
+            className={`mobile-header${isDetail ? " mobile-header-detail" : ""}`}
+          >
+            <div className="mobile-left">
+              <div id={MOBILE_BACK_SLOT_ID} className="mobile-back-slot" />
+              <div className="mobile-brand">
+                <BrandMark className="mobile-brand-mark" />
+                <div className="mobile-brand-text">
+                  <div className="mobile-brand-name">Deep Tracker</div>
+                  {version && (
+                    <div className="mobile-brand-version">
+                      v{version.replace(/^v/, "")}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
             <div className="mobile-title">{screenTitle(pathname)}</div>

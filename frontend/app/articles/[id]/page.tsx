@@ -2,7 +2,11 @@
 
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { SHELL_REFRESH_EVENT } from "@/components/AppShell";
+import { createPortal } from "react-dom";
+import {
+  MOBILE_BACK_SLOT_ID,
+  SHELL_REFRESH_EVENT,
+} from "@/components/AppShell";
 import { useToast } from "@/components/Toast";
 import { ApiErrorPanel, LoadingSkeleton } from "@/components/states";
 import { api } from "@/lib/api/client";
@@ -62,6 +66,13 @@ export default function ArticleDetailPage() {
       cancelled = true;
     };
   }, [id, reloadKey]);
+
+  // モバイルのヘッダー左に「戻る」を出すため、シェル側の差し込み先を取得する
+  const [backSlot, setBackSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setBackSlot(document.getElementById(MOBILE_BACK_SLOT_ID));
+  }, []);
 
   const content = article?.content;
   const html = useMemo(() => (content ? sanitizeHtml(content) : ""), [content]);
@@ -135,6 +146,30 @@ export default function ArticleDetailPage() {
 
   return (
     <div className="art-detail">
+      {backSlot &&
+        createPortal(
+          <button
+            type="button"
+            className="mobile-back"
+            aria-label={backLabel}
+            onClick={goBack}
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+          </button>,
+          backSlot,
+        )}
       <button type="button" className="det-back" onClick={goBack}>
         <svg
           width="16"
