@@ -11,6 +11,7 @@ from collections.abc import Callable
 import httpx
 
 from deep_tracker.config import Settings
+from deep_tracker.config.bind import BindError, resolve_bind_ip
 from deep_tracker.config.dev import is_dev_mode
 
 logger = logging.getLogger("deep_tracker.notify.slack")
@@ -23,19 +24,11 @@ RETRY_WAIT_SECONDS = 1.0
 def gui_url(settings: Settings, path: str = "/") -> str:
     if settings.slack.base_url is not None:
         return f"{str(settings.slack.base_url).rstrip('/')}{path}"
-    host = settings.frontend.host
-    if host == "0.0.0.0":  # noqa: S104  待ち受け用アドレスはリンクに使えない
+    try:
+        host = resolve_bind_ip() or "localhost"
+    except BindError:
         host = "localhost"
     return f"http://{host}:{settings.frontend.port}{path}"
-
-
-def warn_if_link_unreachable(settings: Settings) -> None:
-    """LAN公開中に base_url が未指定だと、通知のリンクは他端末から開けないため警告する。"""
-    if settings.slack.enabled and settings.lan_exposed and settings.slack.base_url is None:
-        logger.warning(
-            "frontend.host が 0.0.0.0 ですが slack.base_url が未指定のため、"
-            "Slack通知のリンクは localhost になり、LAN内の他端末からは開けません"
-        )
 
 
 def build_message(title: str, body: str | None = None, link: str | None = None) -> str:
@@ -56,7 +49,6 @@ class SlackNotifier:
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self._settings = settings
-        warn_if_link_unreachable(settings)
         self._client = client
         self._sleep = sleep
 

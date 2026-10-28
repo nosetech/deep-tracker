@@ -41,3 +41,6 @@ jobs:
 
       - name: next build
         run: npm run build
+
+      - name: node --test
+        run: npm test

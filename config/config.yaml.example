@@ -6,7 +6,7 @@ instance: default # 並行稼働時はバージョン番号など。launchdジ�
 backend:
   port: 8700 # バックエンドは常に 127.0.0.1 で待ち受ける
 frontend:
-  host: 127.0.0.1 # LAN公開する場合は 0.0.0.0（scripts/start.sh で起動）
+  # 待ち受けアドレスは設定ファイルでは指定しない。LAN公開は環境変数 LAN_IP / TAILSCALE_IP（docs/setup.md）
   port: 3700
 db:
   path: data/deep-tracker.db # 相対パスは展開先ディレクトリ基準
@@ -18,7 +18,7 @@ slack:
   enabled: false # true の場合は webhook_url が必須
   # webhook_url: https://hooks.slack.com/services/XXX/YYY/ZZZ
   notify_on_failure: true # サマリ生成の失敗（利用制限など）も通知する
-  # base_url: http://192.168.0.10:3700 # 通知内のGUIリンクのベースURL。未指定なら frontend.host/port から作る
+  # base_url: http://192.168.0.10:3700 # 通知内のGUIリンクのベースURL。未指定なら LAN_IP / TAILSCALE_IP（なければ localhost）と frontend.port から作る
 feed:
   fetch_interval_minutes: 60 # フィード取得の既定間隔（分）
 ai:

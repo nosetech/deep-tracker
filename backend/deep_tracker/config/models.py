@@ -20,9 +20,18 @@ class BackendSettings(_Section):
 
 
 class FrontendSettings(_Section):
-    # LAN公開する場合は 0.0.0.0 にする
-    host: str = "127.0.0.1"
+    # 待ち受けアドレスは設定ファイルではなく環境変数 LAN_IP / TAILSCALE_IP で指定する
     port: int = Field(3700, ge=1, le=65535)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_removed_host(cls, data: object) -> object:
+        if isinstance(data, dict) and "host" in data:
+            raise ValueError(
+                "frontend.host は廃止されました。LAN公開は環境変数 LAN_IP または "
+                "TAILSCALE_IP で指定してください（docs/setup.md）"
+            )
+        return data
 
 
 class DbSettings(_Section):
@@ -43,7 +52,8 @@ class SlackSettings(_Section):
     webhook_url: HttpUrl | None = None
     # サマリ生成の失敗も通知するか
     notify_on_failure: bool = True
-    # 通知に含めるGUIリンクのベースURL。未指定なら frontend.host / port から組み立てる
+    # 通知に含めるGUIリンクのベースURL。
+    # 未指定なら LAN_IP / TAILSCALE_IP（なければ localhost）と frontend.port から組み立てる
     base_url: HttpUrl | None = None
 
     @model_validator(mode="after")
@@ -81,7 +91,3 @@ class Settings(_Section):
     slack: SlackSettings = SlackSettings()
     feed: FeedSettings = FeedSettings()
     ai: AISettings = AISettings()
-
-    @property
-    def lan_exposed(self) -> bool:
-        return self.frontend.host == "0.0.0.0"  # noqa: S104

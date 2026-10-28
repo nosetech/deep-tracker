@@ -18,7 +18,8 @@ backend（`backend/` で実行。uv + ruff + pytest）:
 frontend（`frontend/` で実行。npm）:
 
 - セットアップ: `npm install`
-- 起動: `npm run dev`（`:3700`。`/api/*` は `BACKEND_URL` へ中継）
+- 起動: `npm run dev`（`:3700`。`/api/*` は実行時の `BACKEND_URL` へ中継）。待ち受けIPは環境変数 `LAN_IP` / `TAILSCALE_IP`（どちらか一方、未指定は `127.0.0.1`）
+- テスト: `npm test`（Route Handler の中継）
 - lint: `npm run lint` / `npm run format:check`（整形は `npm run format`）
 - 型チェック: `npm run typecheck`
 - ビルド: `npm run build`（`NODE_ENV` が `development` だと失敗する場合は `env -u NODE_ENV npm run build`）
@@ -67,7 +68,7 @@ frontend（`frontend/` で実行。npm）:
 - 設定ファイルはアプリケーションの展開先に同梱する（producer-desk と同様）。複数バージョンを並行して動かせるようにするため、DBのパスとポートは設定で分ける。`*.yaml.example` をコミットし、実ファイルは `.gitignore` に入れる。
 - Slack Webhook URL は設定ファイルから読む。
 - 記事の保存期間はデフォルト1年で、設定で変更可能。
-- LAN公開はデフォルトで `127.0.0.1`。LAN公開は設定で有効化する。
+- LAN公開はデフォルトで `127.0.0.1`。LAN公開は環境変数 `LAN_IP` / `TAILSCALE_IP`（どちらか一方）で待ち受けIPを指定して有効化する（`0.0.0.0` は使わない）。
 - 既読/未読を記事単位で管理する。
 - RSSの取得は必ずバックエンド経由（CORS回避）。
 - 更新検知（RSSのないサイト）はMVPに含めない。別途開発する。

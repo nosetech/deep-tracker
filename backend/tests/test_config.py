@@ -21,9 +21,8 @@ def test_defaults_when_default_file_missing(monkeypatch, tmp_path):
     s = load_settings()
     assert s.retention.days == 365
     assert s.summary.interval == "weekly"
-    assert s.frontend.host == "127.0.0.1"
+    assert s.frontend.port == 3700
     assert s.backend.port == 8700
-    assert not s.lan_exposed
     assert s.slack.enabled is False
 
 
@@ -31,20 +30,20 @@ def test_example_is_valid_and_matches_defaults():
     s = load_settings(EXAMPLE)
     assert s.retention.days == 365
     assert s.summary.interval == "weekly"
-    assert s.frontend.host == "127.0.0.1"
+    assert s.frontend.port == 3700
 
 
 def test_override(tmp_path):
     p = write(
         tmp_path,
         "retention: {days: 30}\nsummary: {interval: daily}\n"
-        "frontend: {host: 0.0.0.0, port: 3710}\ndb: {path: /abs/x.db}\n"
+        "frontend: {port: 3710}\ndb: {path: /abs/x.db}\n"
         "slack: {enabled: true, webhook_url: 'https://hooks.slack.com/services/a/b/c'}\n",
     )
     s = load_settings(p)
     assert s.retention.days == 30
     assert s.summary.interval == "daily"
-    assert s.lan_exposed and s.frontend.port == 3710
+    assert s.frontend.port == 3710
     assert s.db.path == "/abs/x.db"
     assert s.slack.enabled
 
@@ -139,11 +138,18 @@ def test_config_api_version_unknown_without_metadata(monkeypatch):
     assert TestClient(app).get("/api/config").json()["version"] == "unknown"
 
 
+def test_frontend_host_is_rejected_with_migration_hint(tmp_path):
+    with pytest.raises(ConfigError, match="LAN_IP"):
+        load_settings(write(tmp_path, "frontend: {host: 0.0.0.0}\n"))
+
+
 def test_launch_settings_output(monkeypatch, tmp_path, capsys):
     from deep_tracker.config import __main__ as launch
 
-    path = write(tmp_path, "frontend:\n  host: 0.0.0.0\n  port: 3710\nbackend:\n  port: 8710\n")
+    path = write(tmp_path, "frontend:\n  port: 3710\nbackend:\n  port: 8710\n")
     monkeypatch.setenv(loader.CONFIG_ENV, str(path))
+    monkeypatch.delenv("LAN_IP", raising=False)
+    monkeypatch.delenv("TAILSCALE_IP", raising=False)
     loader.get_settings.cache_clear()
     try:
         assert launch.main() == 0
@@ -152,8 +158,39 @@ def test_launch_settings_output(monkeypatch, tmp_path, capsys):
     assert capsys.readouterr().out.splitlines() == [
         "INSTANCE=default",
         f"LOG_DIR={loader.LOG_DIR}",
-        "FRONTEND_HOST=0.0.0.0",
+        "FRONTEND_HOST=127.0.0.1",
+        "FRONTEND_PUBLIC=",
         "FRONTEND_PORT=3710",
         "BACKEND_PORT=8710",
         "BASE_URL_HOST=''",
     ]
+
+
+def test_launch_settings_uses_lan_ip(monkeypatch, tmp_path, capsys):
+    from deep_tracker.config import __main__ as launch
+
+    monkeypatch.setenv(loader.CONFIG_ENV, str(write(tmp_path, "")))
+    monkeypatch.setenv("LAN_IP", "192.168.0.10")
+    monkeypatch.delenv("TAILSCALE_IP", raising=False)
+    loader.get_settings.cache_clear()
+    try:
+        assert launch.main() == 0
+    finally:
+        loader.get_settings.cache_clear()
+    out = capsys.readouterr().out.splitlines()
+    assert "FRONTEND_HOST=192.168.0.10" in out
+    assert "FRONTEND_PUBLIC=1" in out
+
+
+def test_launch_settings_fails_when_both_ips_given(monkeypatch, tmp_path, capsys):
+    from deep_tracker.config import __main__ as launch
+
+    monkeypatch.setenv(loader.CONFIG_ENV, str(write(tmp_path, "")))
+    monkeypatch.setenv("LAN_IP", "192.168.0.10")
+    monkeypatch.setenv("TAILSCALE_IP", "100.64.0.1")
+    loader.get_settings.cache_clear()
+    try:
+        assert launch.main() == 1
+    finally:
+        loader.get_settings.cache_clear()
+    assert "同時に指定できません" in capsys.readouterr().err

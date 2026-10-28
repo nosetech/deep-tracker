@@ -65,7 +65,6 @@ def test_dev_config_is_isolated(tmp_path):
     settings = load_settings(path)
     assert settings.instance == "dev-wt"
     assert (settings.backend.port, settings.frontend.port) == (18001, 18002)
-    assert settings.frontend.host == "127.0.0.1"
     assert settings.db.path == str(tmp_path / "deep-tracker.db")
     assert settings.slack.enabled is False
 

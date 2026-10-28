@@ -79,7 +79,7 @@ def build_dev_config(run_dir: Path, worktree: str, backend_port: int, frontend_p
     config = {
         "instance": instance_name(worktree),
         "backend": {"port": backend_port},
-        "frontend": {"host": "127.0.0.1", "port": frontend_port},
+        "frontend": {"port": frontend_port},
         "db": {"path": str(run_dir / "deep-tracker.db")},
         "slack": {"enabled": False},
     }
