@@ -171,6 +171,24 @@ a:hover {
   letter-spacing: 0.01em;
 }
 
+.brand-text {
+  position: relative;
+  min-width: 0;
+}
+
+/* アプリ名の下に重ねて置き、有無でアプリ名の位置が動かないようにする */
+.brand-version {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  margin-top: 1px;
+  font-family: var(--font-plex-mono), "IBM Plex Mono", monospace;
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--tx3);
+  white-space: nowrap;
+}
+
 .nav-list {
   display: flex;
   flex-direction: column;
@@ -308,17 +326,88 @@ a:hover {
   .mobile-header {
     flex: none;
     height: 52px;
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
-    gap: 4px;
+    gap: 8px;
     padding: 0 8px 0 12px;
     background: var(--surface);
     border-bottom: 1px solid var(--line);
   }
 
-  .mobile-title {
-    flex: 1;
+  .mobile-left {
     min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .mobile-back-slot {
+    display: contents;
+  }
+
+  /* 記事詳細では、アプリ名の代わりに「戻る」を出す */
+  .mobile-header-detail .mobile-brand {
+    display: none;
+  }
+
+  .mobile-back {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    margin-left: -12px;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    color: var(--tx);
+  }
+
+  .mobile-brand {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .mobile-brand-mark {
+    width: 22px;
+    height: 22px;
+    flex: none;
+    display: block;
+  }
+
+  .mobile-brand-text {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+  }
+
+  .mobile-brand-name {
+    font-weight: 700;
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mobile-brand-version {
+    font-family: var(--font-plex-mono), "IBM Plex Mono", monospace;
+    font-size: 10px;
+    color: var(--tx3);
+    white-space: nowrap;
+  }
+
+  .theme-toggle-mobile {
+    justify-self: end;
+  }
+
+  .mobile-title {
+    min-width: 0;
+    max-width: 40vw;
+    text-align: center;
     font-weight: 700;
     font-size: 16px;
     white-space: nowrap;

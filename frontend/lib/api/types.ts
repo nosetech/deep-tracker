@@ -131,6 +131,11 @@ export type GenerationState = {
   reset_text: string | null;
 };
 
+export type AppConfig = {
+  instance: string;
+  version: string;
+};
+
 export type SummaryConfig = {
   interval: "daily" | "weekly" | "monthly";
   next_run_at: string;
