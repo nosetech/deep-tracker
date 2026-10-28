@@ -96,6 +96,33 @@ function formatLastFetch(iso: string | null): string {
   return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
+function BrandMark({ className }: { className: string }) {
+  return (
+    <svg className={className} viewBox="0 0 64 64" aria-hidden="true">
+      <rect width="64" height="64" rx="14" fill="var(--tx)" />
+      <path
+        d="M15 14H28A18 18 0 0 1 28 50H15Z"
+        fill="none"
+        stroke="var(--bg)"
+        strokeWidth="5.5"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M24 25H32M24 39H30"
+        stroke="var(--bg)"
+        strokeWidth="4"
+        strokeLinecap="round"
+      />
+      <path
+        d="M24 32H37"
+        stroke="#f2c14e"
+        strokeWidth="4"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const active = activeKey(pathname);
@@ -152,28 +179,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="app">
         <nav className="sidebar" aria-label="メインナビゲーション">
           <div className="brand">
-            <svg className="brand-mark" viewBox="0 0 64 64" aria-hidden="true">
-              <rect width="64" height="64" rx="14" fill="var(--tx)" />
-              <path
-                d="M15 14H28A18 18 0 0 1 28 50H15Z"
-                fill="none"
-                stroke="var(--bg)"
-                strokeWidth="5.5"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M24 25H32M24 39H30"
-                stroke="var(--bg)"
-                strokeWidth="4"
-                strokeLinecap="round"
-              />
-              <path
-                d="M24 32H37"
-                stroke="#f2c14e"
-                strokeWidth="4"
-                strokeLinecap="round"
-              />
-            </svg>
+            <BrandMark className="brand-mark" />
             <div className="brand-text">
               <div className="brand-name">Deep Tracker</div>
               {version && (
@@ -220,6 +226,17 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="main-col">
           <header className="mobile-header">
+            <div className="mobile-brand">
+              <BrandMark className="mobile-brand-mark" />
+              <div className="mobile-brand-text">
+                <div className="mobile-brand-name">Deep Tracker</div>
+                {version && (
+                  <div className="mobile-brand-version">
+                    v{version.replace(/^v/, "")}
+                  </div>
+                )}
+              </div>
+            </div>
             <div className="mobile-title">{screenTitle(pathname)}</div>
             <ThemeToggle className="theme-toggle-mobile" />
           </header>

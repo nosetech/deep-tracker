@@ -7,3 +7,7 @@ Claude Design のチャットに送った変更指示。
 ```
 
 DesignSync で `Deep Tracker.dc.html` を取得し、アプリ名の直下に `position:absolute; top:100%; margin-top:1px`、IBM Plex Mono 11px、行高1.2、色 `var(--tx3)` で表示されることを確認済み。モバイルヘッダーには表示しない。
+
+## 追補: モバイルのヘッダーにもアプリ名とバージョンを表示する
+
+モバイルでもアプリ名を表示するよう、Claude Design 側でデザインを修正した（ヘッダー左にマーク22px + 「Deep Tracker」13px + その下に `v0.1.0` 10px / IBM Plex Mono / `var(--tx3)`、画面タイトルは中央、テーマ切替は右）。上の指示プロンプトの「モバイルのヘッダーにはバージョンを表示しない」は、この追補で置き換わる。

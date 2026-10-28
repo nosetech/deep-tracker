@@ -326,17 +326,59 @@ a:hover {
   .mobile-header {
     flex: none;
     height: 52px;
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
-    gap: 4px;
+    gap: 8px;
     padding: 0 8px 0 12px;
     background: var(--surface);
     border-bottom: 1px solid var(--line);
   }
 
-  .mobile-title {
-    flex: 1;
+  .mobile-brand {
     min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .mobile-brand-mark {
+    width: 22px;
+    height: 22px;
+    flex: none;
+    display: block;
+  }
+
+  .mobile-brand-text {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+  }
+
+  .mobile-brand-name {
+    font-weight: 700;
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mobile-brand-version {
+    font-family: var(--font-plex-mono), "IBM Plex Mono", monospace;
+    font-size: 10px;
+    color: var(--tx3);
+    white-space: nowrap;
+  }
+
+  .theme-toggle-mobile {
+    justify-self: end;
+  }
+
+  .mobile-title {
+    min-width: 0;
+    max-width: 40vw;
+    text-align: center;
     font-weight: 700;
     font-size: 16px;
     white-space: nowrap;
