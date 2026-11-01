@@ -5,7 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from deep_tracker.api.articles import SORT_KEY
@@ -172,7 +172,10 @@ def _detail(session: Session, s: Summary) -> SummaryDetail:
         topics.append(SummaryTopic(title=t["title"], summary=t["summary"], sources=sources))
     since = SORT_KEY >= _as_utc(s.period_end)
     count, unread = session.execute(
-        select(func.count(), func.coalesce(func.sum(Article.is_read.is_(False)), 0)).where(since)
+        select(
+            func.count(),
+            func.coalesce(func.sum(case((Article.is_read.is_(False), 1), else_=0)), 0),
+        ).where(since)
     ).one()
     item = _list_item(session, s)
     return SummaryDetail(
