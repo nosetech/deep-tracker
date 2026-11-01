@@ -107,6 +107,36 @@ def test_list_and_detail(client, factory):
     assert client.get("/api/summaries/2").status_code == 404
 
 
+def _new_since(client, factory, *, unread, read):
+    _seed(factory)
+    now = datetime.now(UTC)
+    with factory() as s:
+        feed = s.query(Feed).one()
+        # _seed の「新しい記事」(未読1件) を既読にし、指定件数を追加する
+        s.query(Article).filter(Article.guid == "2").update({"is_read": True})
+        for i in range(unread + read):
+            s.add(
+                Article(
+                    feed_id=feed.id,
+                    guid=f"n{i}",
+                    title=f"新着{i}",
+                    url=f"https://example.com/n{i}",
+                    published_at=now - timedelta(hours=i + 1),
+                    is_read=i >= unread,
+                )
+            )
+        s.commit()
+    return client.get("/api/summaries/latest").json()["new_since"]
+
+
+def test_new_since_unread_count_multiple(client, factory):
+    assert _new_since(client, factory, unread=2, read=1) == {"count": 4, "unread_count": 2}
+
+
+def test_new_since_unread_count_zero(client, factory):
+    assert _new_since(client, factory, unread=0, read=2) == {"count": 3, "unread_count": 0}
+
+
 def test_generate_enqueues_job_once(client, factory):
     _seed(factory)
     res = client.post("/api/summaries/generate")
