@@ -36,6 +36,51 @@ LAN公開する手順:
 > **リスク**: 本アプリに認証はない。`LAN_IP` / `TAILSCALE_IP` を指定すると、同じネットワーク（tailnet）に接続できる全員が購読フィードの閲覧・追加・削除、既読操作などを行える。
 > 自宅などの信頼できるネットワーク内に限り、外出時は VPN 経由でアクセスすること。インターネットへ直接公開（ポート開放など）してはならない。
 
+# 常時起動（backend / frontend）
+
+`scripts/start.sh` は手動起動のため、Mac の再起動やクラッシュで止まる。launchd の per-user LaunchAgent に登録すると、ログイン時に自動で起動し、落ちても再起動する（定期実行バッチと同じ方式）。
+
+## 1. 登録
+
+```bash
+cd backend && uv sync && cd ..
+(cd frontend && npm install)
+scripts/service.sh install     # LAN公開する場合は LAN_IP=192.168.0.10 scripts/service.sh install
+```
+
+- frontend が未ビルドなら先にビルドする。`backend/.venv/bin/python` と `node` を直接起動し、`nohup` / PIDファイルは使わない
+- ジョブ名は `com.nosetech.deep-tracker.<instance>.{backend,frontend}`（instance ごとに別サービス）
+- `LAN_IP` / `TAILSCALE_IP` / `DEEP_TRACKER_CONFIG` は launchd に渡らないため、**install 時の値が plist に固定される**。変えるときは値を指定して `install` を再実行する
+- `PATH` は install したシェルの値を引き継ぐ（`node` / `uv` / `claude` の場所のため）。`claude` が見つからない場合は `ai.command` に絶対パスを指定する
+- 再実行で更新できる。`scripts/start.sh` で起動中のときは、先に `scripts/stop.sh` が必要
+
+## 2. 操作
+
+| コマンド | 動作 |
+|---|---|
+| `scripts/service.sh status` | 登録状況・状態・pid を表示する |
+| `scripts/service.sh restart` | 再起動する（`config.yaml` の変更を反映する） |
+| `scripts/service.sh stop` | 停止する（plist は残る。次回ログイン時に再び起動する） |
+| `scripts/service.sh start` | `stop` したサービスを起動する |
+| `scripts/service.sh uninstall` | 停止して登録を解除し、plist を削除する |
+
+- 登録中は `scripts/start.sh` が「常時起動に登録されている」と表示して止まる（二重起動の防止）。手動起動したいときは `stop` か `uninstall` する
+- 設定変更（`config.yaml`）は `restart` で反映する。バッチ（fetch / summary）は次回の起動から反映される
+
+## 3. 複数バージョンの並行稼働
+
+`config.yaml` の `instance` / ポート / DBパスを分けた別の展開先で `scripts/service.sh install` を実行する。Label に instance が含まれるため別サービスとして登録される。定期実行バッチとは別のジョブなので干渉しない。
+
+## 4. ログ
+
+`logs/backend.log` / `logs/frontend.log`（`scripts/start.sh` と同じ場所）。
+
+## 5. 注意
+
+- LaunchAgent はユーザーがログインしている間だけ動く。ログイン前から動かす必要がある場合は LaunchDaemon が要るが、起動ユーザーや `claude` CLI のログイン状態に影響するため本機能の対象外
+- Mac がスリープすると、LAN内の他端末やSlackのリンクから使えない。必要なら `caffeinate` や「システム設定 > 省エネルギー」でスリープを防ぐ（本機能の対象外）
+- launchd 配下から `claude` を実行するため、サマリ生成で Keychain のログイン状態が引き継がれるかを実機で確認すること
+
 # 定期取得バッチ
 
 購読フィードを launchd で定期的に自動取得する手順。対象は macOS（per-user LaunchAgent）。

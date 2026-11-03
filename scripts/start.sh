@@ -22,6 +22,10 @@ start | dev) ;;
 esac
 
 for svc in backend frontend; do
+    if service_registered "$svc"; then
+        echo "$svc は常時起動（launchd）に登録されています。scripts/service.sh stop（または uninstall）で止めてから実行してください" >&2
+        exit 1
+    fi
     if is_running "$svc"; then
         echo "$svc は既に起動しています（pid $(cat "$(pid_file "$svc")")）。先に scripts/stop.sh を実行してください" >&2
         exit 1
@@ -30,12 +34,8 @@ done
 
 # /api/* の中継先は実行時に BACKEND_URL から読まれる（ビルドし直し不要）。backend は常に 127.0.0.1
 BACKEND_URL="${BACKEND_URL:-http://127.0.0.1:$BACKEND_PORT}"
-# 旧方式（rewrites）のビルドは BACKEND_URL ファイルが残っているため、1度だけ作り直す
-LEGACY_MARKER="$DEPLOY_ROOT/frontend/.next/BACKEND_URL"
-if [[ "$MODE" == start ]] && [[ ! -f "$DEPLOY_ROOT/frontend/.next/BUILD_ID" || -f "$LEGACY_MARKER" ]]; then
-    echo "frontend をビルドします"
-    rm -f "$LEGACY_MARKER"
-    (cd "$DEPLOY_ROOT/frontend" && env -u NODE_ENV npm run build)
+if [[ "$MODE" == start ]]; then
+    ensure_frontend_build
 fi
 
 (cd "$DEPLOY_ROOT/backend" && nohup uv run python -m deep_tracker.main \
