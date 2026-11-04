@@ -59,6 +59,18 @@ LAN内やtailnetの別デバイスから開く場合は、環境変数 `LAN_IP` 
 3. **サマリを見る**: 「サマリ」で最新のサマリと過去のサマリを確認する。「今すぐサマリを生成」で任意のタイミングで生成もできる（この場合Slackには通知されない）
 4. **Slackに通知する**: `slack.enabled: true` と `slack.webhook_url` を設定すると、定期実行で生成されたサマリの結果（失敗も）が通知される。画面の「今すぐサマリを生成」では通知されない。通知内のリンクは `slack.base_url`（未指定なら `LAN_IP` / `TAILSCALE_IP`、なければ `localhost` と `frontend.port`）から作られる
 
+### 常時起動
+
+Mac へのログイン時に自動で起動し、落ちても再起動したい場合は、launchd に登録する（`start.sh` とは併用できない）。
+
+```sh
+scripts/service.sh install    # 登録して起動（LAN公開は LAN_IP=... scripts/service.sh install）
+scripts/service.sh restart    # 設定変更を反映
+scripts/service.sh uninstall  # 解除
+```
+
+詳細は [docs/setup.md](docs/setup.md) を参照。
+
 ### 定期実行
 
 フィード取得とサマリ生成は、launchdに登録すると自動で実行される。

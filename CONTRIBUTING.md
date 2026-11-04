@@ -20,7 +20,7 @@ cp config/config.yaml.example config/config.yaml   # 実ファイルは .gitigno
 | `backend/` | Python（FastAPI）のバックエンド |
 | `frontend/` | Next.js / TypeScript のフロントエンド |
 | `config/` | 設定ファイル（`config.yaml.example` のみコミット） |
-| `scripts/` | backend・frontendの起動/停止、launchdジョブ（フィード取得・サマリ生成）の管理スクリプト |
+| `scripts/` | backend・frontendの起動/停止、常時起動（`service.sh`）、launchdジョブ（フィード取得・サマリ生成）の管理スクリプト |
 | `docs/` | 要件・技術選定・セットアップ手順・デザインプロンプト |
 
 ## 開発時の起動
