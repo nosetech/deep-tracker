@@ -10,6 +10,7 @@
 #   status     登録状況を表示する
 #
 # 環境変数: LAN_IP | TAILSCALE_IP  frontend を待ち受けさせるIP（install 時の値を plist に固定する）
+#                                 展開先ルートの .env にも書ける（シェルの環境変数が優先）
 #           DEEP_TRACKER_CONFIG  設定ファイルのパス（指定時は install 時の値を plist に固定する）
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -78,6 +79,12 @@ install_service() {
         -e "s|__FRONTEND_PORT__|${FRONTEND_PORT}|g" \
         -e "s|__BACKEND_URL__|${backend_url}|g" \
         "$DEPLOY_ROOT/scripts/com.nosetech.deep-tracker.$svc.plist.example" >"$plist"
+    # 配布版は standalone 出力を node で直接起動する（next の CLI は同梱されない）
+    if [[ "$svc" == frontend ]] && is_standalone; then
+        plutil -replace ProgramArguments -json "[\"${node}\",\"${DEPLOY_ROOT}/frontend/server.js\"]" "$plist"
+        plutil -insert EnvironmentVariables.PORT -string "$FRONTEND_PORT" "$plist"
+        plutil -insert EnvironmentVariables.HOSTNAME -string "$FRONTEND_HOST" "$plist"
+    fi
     # LAN_IP / TAILSCALE_IP / DEEP_TRACKER_CONFIG は launchd に渡らないため、install 時の値を固定する
     # （backend の通知リンク等も同じ値を参照する）
     local var
@@ -99,11 +106,13 @@ install)
         exit 1
     }
     need_tool node
-    need_tool npm
-    [[ -d "$DEPLOY_ROOT/frontend/node_modules/next" ]] || {
-        echo "frontend の依存がありません。先に (cd frontend && npm install) を実行してください" >&2
-        exit 1
-    }
+    if ! is_standalone; then
+        need_tool npm
+        [[ -d "$DEPLOY_ROOT/frontend/node_modules/next" ]] || {
+            echo "frontend の依存がありません。先に (cd frontend && npm install) を実行してください" >&2
+            exit 1
+        }
+    fi
     for svc in "${SERVICES[@]}"; do
         if is_running "$svc"; then
             echo "$svc が scripts/start.sh で起動中です。先に scripts/stop.sh を実行してください" >&2

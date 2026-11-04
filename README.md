@@ -22,6 +22,8 @@ RSSリーダー + AIによる要約システム。購読しているフィード
 
 ## インストールと初期設定
 
+配布版（ビルド済み）は [GitHub Releases](https://github.com/nosetech/deep-tracker/releases) の `deep-tracker-<version>.tar.gz` から入手できる。手順は tarball 内の `SETUP.md` を参照（旧バージョンからの更新用に `scripts/migrate.sh` を同梱）。以下はソースから動かす場合の手順。
+
 ```sh
 cp config/config.yaml.example config/config.yaml
 (cd backend && uv sync)

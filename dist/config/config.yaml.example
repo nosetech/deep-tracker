@@ -1,0 +1,30 @@
+# 配布版の設定ファイルのサンプル。config/config.yaml としてコピーして編集する。
+# 手順は展開先ルートの SETUP.md を参照。
+# 変更の反映にはアプリの再起動が必要（ホットリロードはしない）。
+# 場所を変える場合は環境変数 DEEP_TRACKER_CONFIG にパスを指定する。
+# 書かれていない項目は、ここに記載の既定値で動作する。未知のキーはエラーになる。
+instance: default # 並行稼働時はバージョン番号など。launchdジョブ名に使う
+backend:
+  port: 8700 # バックエンドは常に 127.0.0.1 で待ち受ける
+frontend:
+  # 待ち受けアドレスは設定ファイルでは指定しない。LAN公開は展開先ルートの .env の LAN_IP / TAILSCALE_IP（SETUP.md）
+  port: 3700
+db:
+  path: data/deep-tracker.db # 相対パスは展開先ディレクトリ基準
+retention:
+  days: 365 # 記事の保存期間（日）
+summary:
+  interval: weekly # サマリの実行周期: daily / weekly / monthly
+slack:
+  enabled: false # true の場合は webhook_url が必須
+  # webhook_url: https://hooks.slack.com/services/XXX/YYY/ZZZ
+  notify_on_failure: true # サマリ生成の失敗（利用制限など）も通知する
+  # base_url: http://192.168.0.10:3700 # 通知内のGUIリンクのベースURL。未指定なら LAN_IP / TAILSCALE_IP（なければ localhost）と frontend.port から作る
+feed:
+  fetch_interval_minutes: 60 # フィード取得の既定間隔（分）
+ai:
+  provider: claude_code # 現在は claude_code（Claude Code CLI）のみ
+  # command: /Users/<user>/.local/bin/claude # Claude Code CLI の実行パス。未指定なら PATH 上の claude。launchd では PATH が限られるため絶対パス（`which claude`）を推奨
+  # model: sonnet # 未指定ならCLIの既定
+  timeout_seconds: 300 # 1回のAI呼び出しのタイムアウト（秒）
+  max_concurrent_jobs: 1 # AIジョブの同時実行数。サブスクリプションの制限を踏まえ既定は逐次

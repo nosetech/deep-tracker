@@ -29,3 +29,6 @@ node_modules/
 # 動作確認用インスタンスの実行時ファイル
 .dev-run/
 .next-dev/
+
+# 利用者固有の環境変数（LAN_IP / TAILSCALE_IP）
+.env

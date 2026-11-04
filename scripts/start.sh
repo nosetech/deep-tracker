@@ -2,8 +2,9 @@
 # backend と frontend をバックグラウンドで起動する。
 #
 # 使い方: scripts/start.sh
-# 環境変数: FRONTEND_MODE  start（既定。未ビルドなら build する）| dev
+# 環境変数: FRONTEND_MODE  start（既定。未ビルドなら build する）| dev（配布版は start のみ）
 #           LAN_IP | TAILSCALE_IP  frontend を待ち受けさせるIP（どちらか一方。未指定なら 127.0.0.1）
+#                                 展開先ルートの .env にも書ける（シェルの環境変数が優先）
 #
 # ポートは config.yaml の frontend.port / backend.port に従う。
 # 停止は scripts/stop.sh。
@@ -13,6 +14,10 @@ load_config
 mkdir -p "$LOG_DIR"
 
 MODE="${FRONTEND_MODE:-start}"
+if is_standalone && [[ "$MODE" == dev ]]; then
+    echo "配布版では FRONTEND_MODE=dev は使えません" >&2
+    exit 2
+fi
 case "$MODE" in
 start | dev) ;;
 *)
@@ -54,10 +59,17 @@ fi
 
 # BACKEND_URL は /api/* の中継先
 # ALLOWED_DEV_ORIGINS は next dev が許可する接続元ホスト（既定は slack.base_url のホストと bind先のIP）
-(cd "$DEPLOY_ROOT/frontend" &&
-    FRONTEND_HOST="$FRONTEND_HOST" FRONTEND_PORT="$FRONTEND_PORT" BACKEND_URL="$BACKEND_URL" \
-        ALLOWED_DEV_ORIGINS="${ALLOWED_DEV_ORIGINS:-$DEV_ORIGINS_DEFAULT}" \
-        nohup npm run "$MODE" >>"$LOG_DIR/frontend.log" 2>&1 & echo $! >"$(pid_file frontend)")
+if is_standalone; then
+    # 配布版: Next.js の standalone 出力を node で直接起動する（利用者側の npm / ビルドは不要）
+    (cd "$DEPLOY_ROOT/frontend" &&
+        NODE_ENV=production HOSTNAME="$FRONTEND_HOST" PORT="$FRONTEND_PORT" BACKEND_URL="$BACKEND_URL" \
+            nohup node server.js >>"$LOG_DIR/frontend.log" 2>&1 & echo $! >"$(pid_file frontend)")
+else
+    (cd "$DEPLOY_ROOT/frontend" &&
+        FRONTEND_HOST="$FRONTEND_HOST" FRONTEND_PORT="$FRONTEND_PORT" BACKEND_URL="$BACKEND_URL" \
+            ALLOWED_DEV_ORIGINS="${ALLOWED_DEV_ORIGINS:-$DEV_ORIGINS_DEFAULT}" \
+            nohup npm run "$MODE" >>"$LOG_DIR/frontend.log" 2>&1 & echo $! >"$(pid_file frontend)")
+fi
 
 echo "起動しました: backend http://127.0.0.1:$BACKEND_PORT / frontend http://$FRONTEND_HOST:$FRONTEND_PORT"
 echo "ログ: $LOG_DIR/{backend,frontend}.log"
