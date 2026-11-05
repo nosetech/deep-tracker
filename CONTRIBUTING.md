@@ -21,6 +21,7 @@ cp config/config.yaml.example config/config.yaml   # 実ファイルは .gitigno
 | `frontend/` | Next.js / TypeScript のフロントエンド |
 | `config/` | 設定ファイル（`config.yaml.example` のみコミット） |
 | `scripts/` | backend・frontendの起動/停止、常時起動（`service.sh`）、launchdジョブ（フィード取得・サマリ生成）の管理スクリプト |
+| `dist/` | 配布tarball専用のファイル（下記「配布物（dist/）とリリース」） |
 | `docs/` | 要件・技術選定・セットアップ手順・デザインプロンプト |
 
 ## 開発時の起動
@@ -81,6 +82,33 @@ npm run build
 ## バージョンの更新
 
 画面に表示されるバージョンは `backend/pyproject.toml` の `version` が正。リリース時はここを更新し、`frontend/package.json` の `version` も同じ値に揃える（画面表示には使わない）。設定ファイルの `instance` は並行稼働の識別子で、表示されるバージョンとは別物。
+
+## 配布物（dist/）とリリース
+
+リリースは GitHub Releases の tarball（`deep-tracker-<version>.tar.gz` と `.sha256`）で配布する。`v*.*.*` タグの push で `.github/workflows/release.yml` が、バージョン一致の検証 → backend / frontend の lint・テスト・ビルド → tarball 作成 → Release 公開まで行う。frontend は Next.js の standalone 出力をビルド済みで同梱し、利用者側の npm / ビルドは不要。
+
+### dist/ と開発用ファイルの対応
+
+開発用と配布用で内容が異なるものだけを `dist/` に置く。共通実体のものは `dist/` に複製せず、ワークフローが組み立て時に直接コピーする（二重管理を避ける）。
+
+| 配布物の中 | 元 | 備考 |
+|---|---|---|
+| `SETUP.md` | `dist/SETUP.md` | 配布専用。`docs/setup.md` / `README.md` の手順と乖離させない |
+| `.env.example` | `dist/.env.example` | frontend の公開先IP（`LAN_IP` / `TAILSCALE_IP`）。読み込みは `scripts/lib.sh` の `load_env` |
+| `config/config.yaml.example` | `dist/config/config.yaml.example` | `config/config.yaml.example` と冒頭コメント・参照先以外は同じにする |
+| `scripts/migrate.sh`, `scripts/_migrate_helper.py` | `dist/scripts/` | 旧展開先からの引き継ぎ。テストは `backend/tests/test_migrate.py` |
+| `scripts/*.sh`, `scripts/*.plist.example` | `scripts/` | 共通実体。`dev-instance.sh` は含めない。`lib.sh` の `is_standalone`（`frontend/server.js` の有無）で配布版の起動方法に切り替わる |
+| `backend/` | `backend/` | ソース + `pyproject.toml` / `uv.lock` / `alembic.ini` / `migrations`（テストは含めない） |
+| `frontend/` | `frontend/` | `next build` の standalone 出力に `.next/static` と `public/` を加えたもの |
+
+### リリース手順
+
+1. `/release-prepare <version>`（`.claude/skills/release-prepare`）で、バージョン更新・`dist/` の最新化確認・`v<version> リリース` コミットの作成・`master` 宛PRの作成までを行う
+2. PRをレビューし、`master` にマージする（squash merge。コミット本文がリリースノートになる）
+3. `master` 上で `git tag v<version>` → `git push origin v<version>`（リリースワークフローが起動する）
+4. `master` を `develop` にマージして履歴を統合する（`develop` は直接pushできないためPR経由）
+
+バージョンの正は `backend/pyproject.toml`。`frontend/package.json` と一致していないと `release.yml` が失敗する。
 
 ## ブランチ運用
 

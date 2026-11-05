@@ -5,6 +5,10 @@
 frontend の待ち受けアドレスは環境変数 `LAN_IP` / `TAILSCALE_IP`、ポートは `config/config.yaml` の `frontend.port` で決まる（producer-desk と同じ方式）。
 バックエンドは常に `127.0.0.1` で待ち受け、LAN公開の対象にならない（ブラウザは frontend の `/api/*` 中継経由でアクセスする）。
 
+`LAN_IP` / `TAILSCALE_IP` は、シェルの環境変数のほか、展開先ルートの `.env`（`KEY=VALUE` 形式。サンプルは配布物の `.env.example`）にも書ける。`.env` は `scripts/start.sh` / `scripts/service.sh` が読み込み、シェルで指定済みの環境変数が優先される。`.env` は `.gitignore` 対象。
+
+tarball での配布・更新（`dist/SETUP.md`、`dist/scripts/migrate.sh`）とリリース手順は `CONTRIBUTING.md` を参照。
+
 ```bash
 cd backend && uv sync && cd ..
 (cd frontend && npm install)

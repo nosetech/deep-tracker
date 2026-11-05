@@ -1,0 +1,154 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write # gh release create / アセットアップロードに必要
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false # リリース処理は途中キャンセルさせない
+
+jobs:
+  validate-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: check
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PYPROJECT_VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('backend/pyproject.toml','rb'))['project']['version'])")
+          PACKAGE_VERSION=$(jq -r .version frontend/package.json)
+          if [ "$TAG_VERSION" != "$PYPROJECT_VERSION" ] || [ "$TAG_VERSION" != "$PACKAGE_VERSION" ]; then
+            echo "::error::タグ($TAG_VERSION) / backend($PYPROJECT_VERSION) / frontend($PACKAGE_VERSION) のバージョンが一致していません"
+            exit 1
+          fi
+          echo "version=$TAG_VERSION" >> "$GITHUB_OUTPUT"
+
+  backend:
+    needs: validate-version
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - run: uv sync --frozen
+      - run: uv run ruff format --check .
+      - run: uv run ruff check .
+      - run: uv run pytest
+
+  frontend:
+    needs: validate-version
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - name: next build (standalone)
+        run: npm run build
+        env:
+          NODE_ENV: production # NODE_ENV非標準値によるビルド失敗を防ぐ
+      - name: assemble standalone package
+        run: |
+          if [ ! -f .next/standalone/server.js ]; then
+            echo "::error::next.config.tsにoutput: \"standalone\"が設定されていません"
+            exit 1
+          fi
+          mkdir -p pkg/frontend/.next
+          cp -r .next/standalone/. pkg/frontend/
+          cp -r .next/static pkg/frontend/.next/static
+          if [ -d public ]; then cp -r public pkg/frontend/public; fi
+      - uses: actions/upload-artifact@v7
+        with:
+          name: frontend-standalone
+          path: frontend/pkg/frontend
+          # upload-artifactはドット始まりのファイル/ディレクトリを既定で除外する。
+          # standalone出力の`.next`（BUILD_ID・サーバーチャンク等）が丸ごと欠落すると、
+          # 展開後に`node server.js`が起動できないため、明示的に含める。
+          include-hidden-files: true
+
+  package-and-release:
+    needs: [validate-version, backend, frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v8
+        with: { name: frontend-standalone, path: pkg/frontend }
+      - name: assemble tarball
+        env:
+          VERSION: ${{ needs.validate-version.outputs.version }}
+        run: |
+          ROOT="deep-tracker-${VERSION}"
+          mkdir -p "${ROOT}/backend" "${ROOT}/config" "${ROOT}/scripts"
+          cp -r pkg/frontend "${ROOT}/frontend"
+          # backend: ソース + uv.lock（利用者側で uv sync）。テスト・キャッシュは含めない
+          cp backend/pyproject.toml backend/uv.lock backend/alembic.ini "${ROOT}/backend/"
+          cp -r backend/deep_tracker backend/migrations "${ROOT}/backend/"
+          find "${ROOT}/backend" \( -name __pycache__ -o -name '*.egg-info' \) -prune -exec rm -rf {} +
+          # 開発用と共通実体のスクリプト・plistは複製せず、ここで直接コピーする（二重管理を避ける）
+          cp scripts/start.sh scripts/stop.sh scripts/lib.sh scripts/service.sh \
+             scripts/fetch-job.sh scripts/summary-job.sh scripts/*.plist.example "${ROOT}/scripts/"
+          # 配布専用のファイル
+          cp dist/scripts/migrate.sh dist/scripts/_migrate_helper.py "${ROOT}/scripts/"
+          cp dist/config/config.yaml.example "${ROOT}/config/config.yaml.example"
+          cp dist/SETUP.md "${ROOT}/SETUP.md"
+          cp dist/.env.example "${ROOT}/.env.example"
+          echo "${VERSION}" > "${ROOT}/VERSION"
+          # SETUP.mdが案内するファイルの欠落を検知する（欠落したままリリースしない）
+          for f in SETUP.md VERSION .env.example config/config.yaml.example \
+                   backend/pyproject.toml backend/uv.lock backend/alembic.ini \
+                   frontend/server.js frontend/.next/BUILD_ID frontend/.next/static \
+                   scripts/start.sh scripts/stop.sh scripts/lib.sh scripts/service.sh \
+                   scripts/fetch-job.sh scripts/summary-job.sh scripts/migrate.sh scripts/_migrate_helper.py \
+                   scripts/com.nosetech.deep-tracker.backend.plist.example \
+                   scripts/com.nosetech.deep-tracker.frontend.plist.example \
+                   scripts/com.nosetech.deep-tracker.fetch.plist.example \
+                   scripts/com.nosetech.deep-tracker.summary.plist.example; do
+            if [ ! -e "${ROOT}/${f}" ]; then
+              echo "::error::配布tarballに必須ファイル ${f} が含まれていません"
+              exit 1
+            fi
+          done
+          tar czf "${ROOT}.tar.gz" "${ROOT}"
+          sha256sum "${ROOT}.tar.gz" > "${ROOT}.tar.gz.sha256"
+      - name: create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.validate-version.outputs.version }}
+        run: |
+          # release-prepareスキルが作ったコミット（squash mergeでmasterに刻まれ、このタグが指す）の
+          # 本文に、前バージョンからの変更点サマリが入っている。これをリリースノート本文に再利用する
+          # （--generate-notesは使わない。masterにはリリースPRしか載らず、有用な情報にならないため）。
+          NOTES="$(git log -1 --format=%b HEAD)"
+          if [ -z "${NOTES}" ]; then
+            NOTES="(変更点サマリがコミットメッセージに含まれていません)"
+          fi
+          gh release create "${GITHUB_REF_NAME}" \
+            "deep-tracker-${VERSION}.tar.gz" \
+            "deep-tracker-${VERSION}.tar.gz.sha256" \
+            --title "deep-tracker ${GITHUB_REF_NAME}" \
+            --notes "${NOTES}"

@@ -10,7 +10,9 @@ const allowedDevOrigins = (process.env.ALLOWED_DEV_ORIGINS ?? "")
   .filter(Boolean);
 
 // 動作確認用インスタンス（scripts/dev-instance.sh）は、運用のビルド成果物を壊さないよう別ディレクトリを使う
+// 配布物は standalone 出力（node server.js で起動。利用者側で npm / ビルドは不要）
 const nextConfig: NextConfig = {
+  output: "standalone",
   allowedDevOrigins,
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
 };
