@@ -1,0 +1,89 @@
+# Deep Tracker
+
+RSSリーダー + AIによる要約システム。購読しているフィードの記事をまとめて読み、AI（Claude Code CLI）が期間ごとのサマリを作る。
+
+利用者は1名、同一LAN内（外出時はVPN）での利用を想定している。認証はない。
+
+## 主な機能
+
+- **購読フィードの管理**: RSSフィードの登録・削除、取得間隔の個別設定、有効/無効の切り替え
+- **記事の閲覧**: 記事一覧、キーワード検索（タイトル・本文）、記事単位の既読/未読管理
+- **サマリ**: 一定期間の記事をAIが要約する。既定は週次で、周期は設定で変えられる。定期実行のほか、画面から今すぐ生成もできる
+- **Slack通知**: 定期実行によるサマリの生成完了（失敗も）をSlackに通知する（任意）。画面からの「今すぐサマリを生成」では通知しない
+
+要件と開発計画は [docs/requirements.md](docs/requirements.md)、技術選定は [docs/architecture.md](docs/architecture.md) を参照。
+
+## 前提
+
+- macOS（定期実行にlaunchdを使う）
+- Python 3.11 以上、[uv](https://docs.astral.sh/uv/)
+- Node.js（npm 同梱）
+- [Claude Code CLI](https://docs.claude.com/en/docs/claude-code)（サブスクリプションでログイン済みであること。サマリの生成に使う）
+
+## インストールと初期設定
+
+配布版（ビルド済み）は [GitHub Releases](https://github.com/nosetech/deep-tracker/releases) の `deep-tracker-<version>.tar.gz` から入手できる。手順は tarball 内の `SETUP.md` を参照（旧バージョンからの更新用に `scripts/migrate.sh` を同梱）。以下はソースから動かす場合の手順。
+
+```sh
+cp config/config.yaml.example config/config.yaml
+(cd backend && uv sync)
+(cd frontend && npm install)
+```
+
+設定は `config/config.yaml` を編集して行う。**画面に設定画面はない**。変更を反映するにはアプリを再起動する（定期実行のバッチは次回の起動から反映される）。
+各項目の意味は `config/config.yaml.example` のコメントを参照。主な項目は次のとおり。
+
+| 項目 | 内容 |
+|---|---|
+| `summary.interval` | サマリの周期（`daily` / `weekly` / `monthly`） |
+| `feed.fetch_interval_minutes` | フィード取得の既定間隔（分） |
+| `retention.days` | 記事の保存期間（日） |
+| `slack.enabled` / `slack.webhook_url` | Slack通知の有効化とWebhook URL |
+| `frontend.port` | 画面の待ち受けポート。既定は `3700`（待ち受けアドレスは環境変数 `LAN_IP` / `TAILSCALE_IP`） |
+
+## 起動・停止
+
+```sh
+scripts/start.sh   # backend と frontend をバックグラウンドで起動（frontend は未ビルドなら自動でビルドする）
+scripts/stop.sh    # 両方を停止
+```
+
+backend は `127.0.0.1:8700`、frontend は既定で `127.0.0.1`、ポートは `config.yaml` の `frontend.port` で待ち受ける。ログは `logs/` に出る。
+
+ブラウザで <http://localhost:3700> を開く（`frontend.port` を変えた場合はそのポート）。
+
+LAN内やtailnetの別デバイスから開く場合は、環境変数 `LAN_IP` または `TAILSCALE_IP`（どちらか一方）に待ち受けさせるIPを指定して起動する（例: `LAN_IP=192.168.0.10 scripts/start.sh`）。`0.0.0.0` では待ち受けない。認証がないため、リスクと手順を [docs/setup.md](docs/setup.md) で確認すること。
+
+## 使い方
+
+1. **フィードを登録する**: 左のメニューの「購読フィード」でRSSのURLを追加する。登録後すぐ取得され、以降は設定した間隔で取得される
+2. **記事を読む**: 「記事一覧」で記事を閲覧する。フィードや未読のみで絞り込め、キーワードで検索できる。記事ごとに既読/未読を切り替えられ、フィード単位でまとめて既読にもできる
+3. **サマリを見る**: 「サマリ」で最新のサマリと過去のサマリを確認する。「今すぐサマリを生成」で任意のタイミングで生成もできる（この場合Slackには通知されない）
+4. **Slackに通知する**: `slack.enabled: true` と `slack.webhook_url` を設定すると、定期実行で生成されたサマリの結果（失敗も）が通知される。画面の「今すぐサマリを生成」では通知されない。通知内のリンクは `slack.base_url`（未指定なら `LAN_IP` / `TAILSCALE_IP`、なければ `localhost` と `frontend.port`）から作られる
+
+### 常時起動
+
+Mac へのログイン時に自動で起動し、落ちても再起動したい場合は、launchd に登録する（`start.sh` とは併用できない）。
+
+```sh
+scripts/service.sh install    # 登録して起動（LAN公開は LAN_IP=... scripts/service.sh install）
+scripts/service.sh restart    # 設定変更を反映
+scripts/service.sh uninstall  # 解除
+```
+
+詳細は [docs/setup.md](docs/setup.md) を参照。
+
+### 定期実行
+
+フィード取得とサマリ生成は、launchdに登録すると自動で実行される。
+
+```sh
+scripts/fetch-job.sh install     # フィードの定期取得
+scripts/summary-job.sh install   # サマリの定期生成
+```
+
+登録・操作・ログの詳細は [docs/setup.md](docs/setup.md) を参照。
+
+## 開発に参加する
+
+開発環境、コマンド、ブランチ運用などは [CONTRIBUTING.md](CONTRIBUTING.md) を参照。

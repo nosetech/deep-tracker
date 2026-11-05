@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- サマリ定期実行バッチ（python -m deep_tracker.jobs.summary）を launchd の per-user LaunchAgent
+     として定期実行するためのテンプレート。
+
+     通常は scripts/summary-job.sh install がこのファイルから plist を生成・登録する。
+     手動で使う場合は、__INSTANCE__ / __DEPLOY_ROOT__ / __INTERVAL_SECONDS__ を置換して
+     ~/Library/LaunchAgents/ に置き、launchctl load -w で読み込む。
+     手順は docs/setup.md を参照。
+
+     ジョブ名（Label）に instance（設定ファイルの instance）を含めるため、
+     instance の異なる展開先を別ジョブとして並行登録できる。 -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.nosetech.deep-tracker.__INSTANCE__.summary</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>__DEPLOY_ROOT__/backend/.venv/bin/python</string>
+        <string>-m</string>
+        <string>deep_tracker.jobs.summary</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>__DEPLOY_ROOT__/backend</string>
+    <!-- 起動間隔。サマリの実行周期（summary.interval）の期間が終わったあと、最初の起動で
+         生成される。ここは「確認の頻度」であり、同一期間は二重生成されない。 -->
+    <key>StartInterval</key>
+    <integer>__INTERVAL_SECONDS__</integer>
+    <key>RunAtLoad</key>
+    <true/>
+    <!-- 通常のログは logging が logs/summary.log に書き、ローテーションする。
+         以下は logging に乗らない出力（起動直後のクラッシュ等）専用の別ファイル。 -->
+    <key>StandardOutPath</key>
+    <string>__DEPLOY_ROOT__/logs/summary.launchd.log</string>
+    <key>StandardErrorPath</key>
+    <string>__DEPLOY_ROOT__/logs/summary.launchd.log</string>
+</dict>
+</plist>

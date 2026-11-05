@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- frontend を常駐サービスとして launchd の per-user LaunchAgent に登録するためのテンプレート。
+     ログイン時に起動し、終了したら再起動する（RunAtLoad / KeepAlive）。
+
+     通常は scripts/service.sh install がこのファイルから plist を生成・登録する
+     （__INSTANCE__ / __DEPLOY_ROOT__ / __PATH__ などの置換と、LAN_IP / TAILSCALE_IP の
+     EnvironmentVariables への追加も行う）。手順は docs/setup.md を参照。
+
+     Label に instance（設定ファイルの instance）を含めるため、
+     instance の異なる展開先を別サービスとして並行登録できる。 -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.nosetech.deep-tracker.__INSTANCE__.frontend</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>__NODE__</string>
+        <string>__DEPLOY_ROOT__/frontend/node_modules/next/dist/bin/next</string>
+        <string>start</string>
+        <string>-H</string>
+        <string>__FRONTEND_HOST__</string>
+        <string>-p</string>
+        <string>__FRONTEND_PORT__</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>__DEPLOY_ROOT__/frontend</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>__PATH__</string>
+        <key>NODE_ENV</key>
+        <string>production</string>
+        <key>BACKEND_URL</key>
+        <string>__BACKEND_URL__</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <!-- 終了したら再起動する。クラッシュの連続による再起動ループを避けるため、10秒以上空ける -->
+    <key>KeepAlive</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+    <key>StandardOutPath</key>
+    <string>__DEPLOY_ROOT__/logs/frontend.log</string>
+    <key>StandardErrorPath</key>
+    <string>__DEPLOY_ROOT__/logs/frontend.log</string>
+</dict>
+</plist>

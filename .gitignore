@@ -1,0 +1,34 @@
+# 設定の実ファイル（*.yaml.example のみコミットする）
+config/*.yaml
+
+# DB・ログ
+data/
+logs/
+*.db
+*.db-shm
+*.db-wal
+
+# Python
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Node.js
+node_modules/
+
+# OS・エディタ
+.DS_Store
+.idea/
+.vscode/
+
+# Serena
+.serena/
+
+# 動作確認用インスタンスの実行時ファイル
+.dev-run/
+.next-dev/
+
+# 利用者固有の環境変数（LAN_IP / TAILSCALE_IP）
+.env
