@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { api } from "@/lib/api/client";
+import { useTabUnreadIndicator, useUnreadCount } from "./useUnreadCount";
 import { ThemeToggle } from "./ThemeToggle";
 import { ToastProvider } from "./Toast";
 
@@ -129,12 +130,13 @@ function BrandMark({ className }: { className: string }) {
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const active = activeKey(pathname);
-  const [unread, setUnread] = useState(0);
   const [errorCount, setErrorCount] = useState(0);
   const [lastFetch, setLastFetch] = useState<string | null>(null);
   const [version, setVersion] = useState<string | null>(null);
 
   const [refreshTick, setRefreshTick] = useState(0);
+  const unread = useUnreadCount(`${pathname}:${refreshTick}`);
+  useTabUnreadIndicator(unread);
 
   // フィード操作などで未読数・エラー表示が変わったとき、画面側から再取得を依頼する
   useEffect(() => {
@@ -154,10 +156,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   // 画面遷移のたびに再取得し、バッジ・エラー表示を最新に保つ
   useEffect(() => {
     let cancelled = false;
-    Promise.all([api.getUnreadCounts(), api.listFeeds()])
-      .then(([counts, feeds]) => {
+    api
+      .listFeeds()
+      .then((feeds) => {
         if (cancelled) return;
-        setUnread(counts.total);
         const enabled = feeds.filter((f) => f.enabled);
         setErrorCount(enabled.filter((f) => f.last_fetch_ok === false).length);
         const times = enabled

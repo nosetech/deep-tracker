@@ -4,17 +4,17 @@
 
 ## 1. 技術選定一覧
 
-| 領域 | 採用 | 備考 |
-|---|---|---|
-| DB | SQLite（WAL モード） | マイグレーションは Alembic |
-| DBアクセス | SQLAlchemy 2.x（同期API） | Alembic と同一のモデル定義を使う |
-| Webフレームワーク | FastAPI + uvicorn | |
-| フィード解析 | feedparser（RSS 1.0/2.0・Atom）＋ JSON Feed は自前の薄いパーサ | HTTP取得は httpx |
-| Python | 3.11 以上 | producer-desk と同じ |
-| Pythonパッケージ管理 | uv + `pyproject.toml`（`uv.lock` をコミット） | lint/format は ruff、テストは pytest |
-| フロント | Next.js（App Router）/ TypeScript | |
-| フロントのパッケージ管理 | npm（`package-lock.json` をコミット） | |
-| frontend ⇔ backend | Next.js の `rewrites` で `/api/*` をバックエンドへ中継 | |
+| 領域                     | 採用                                                           | 備考                                 |
+| ------------------------ | -------------------------------------------------------------- | ------------------------------------ |
+| DB                       | SQLite（WAL モード）                                           | マイグレーションは Alembic           |
+| DBアクセス               | SQLAlchemy 2.x（同期API）                                      | Alembic と同一のモデル定義を使う     |
+| Webフレームワーク        | FastAPI + uvicorn                                              |                                      |
+| フィード解析             | feedparser（RSS 1.0/2.0・Atom）＋ JSON Feed は自前の薄いパーサ | HTTP取得は httpx                     |
+| Python                   | 3.11 以上                                                      | producer-desk と同じ                 |
+| Pythonパッケージ管理     | uv + `pyproject.toml`（`uv.lock` をコミット）                  | lint/format は ruff、テストは pytest |
+| フロント                 | Next.js（App Router）/ TypeScript                              |                                      |
+| フロントのパッケージ管理 | npm（`package-lock.json` をコミット）                          |                                      |
+| frontend ⇔ backend       | Next.js の `rewrites` で `/api/*` をバックエンドへ中継         |                                      |
 
 ## 2. 選定理由
 
@@ -53,16 +53,23 @@
 - LAN公開時もブラウザが到達するのは Next.js のポートのみでよく、バックエンドは常に `127.0.0.1` に bind したままにできる。LAN公開は frontend の待ち受けにのみ適用し、環境変数 `LAN_IP` / `TAILSCALE_IP`（どちらか一方。両方指定はエラー）で指定したIPに bind する。未指定なら `127.0.0.1`。`0.0.0.0` では待ち受けない。
 - RSS の取得は引き続きバックエンドからのみ行う。
 
+### 2-6. タブへの未読表示
+
+- `frontend/lib/tab-unread.ts` に件数の書式・ファビコンSVG・ポーリング制御を純粋関数として置き、`components/useUnreadCount.ts` のフックから使う。
+- 未読件数は `GET /api/articles/unread-counts` を60秒間隔（`UNREAD_POLL_INTERVAL_MS`）でポーリングする。`hidden` でも継続し、`visibilitychange` で `visible` に戻ったときと `SHELL_REFRESH_EVENT` で即時再取得する。
+- タイトルは `document.title` の先頭の件数をクライアント側で付け替え、`<title>` を `MutationObserver` で監視してページ遷移後も再適用する。
+- ファビコンは未読があるとき、`app/icon.svg` と同じ図形に右上のドットを重ねたSVGを `data:` URL で `<link rel="icon">` に追加し、既存のiconは無効化する。0件で元に戻す。
+
 ## 3. 複数バージョン並行稼働
 
 バージョン（例: `0.1.0` と `0.2.0`）ごとに展開先ディレクトリを分け、設定ファイルも各展開先に同梱する。バージョン間で衝突する資源は、すべて設定ファイルの値から導出する。
 
-| 資源 | 割り当て方針 |
-|---|---|
-| ポート | バージョンごとに設定ファイルで指定する。`backend.port` と `frontend.port` を別々に持ち、既定は backend 8700 / frontend 3700。並行稼働する際は、バージョンごとに +10 ずつずらす（例: 8710 / 3710） |
-| DBパス | `db.path` で指定する。既定は展開先配下の `data/deep-tracker.db`。展開先ごとに別ファイルになるため衝突しない |
+| 資源            | 割り当て方針                                                                                                                                                                                             |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ポート          | バージョンごとに設定ファイルで指定する。`backend.port` と `frontend.port` を別々に持ち、既定は backend 8700 / frontend 3700。並行稼働する際は、バージョンごとに +10 ずつずらす（例: 8710 / 3710）        |
+| DBパス          | `db.path` で指定する。既定は展開先配下の `data/deep-tracker.db`。展開先ごとに別ファイルになるため衝突しない                                                                                              |
 | launchdジョブ名 | `com.nosetech.deep-tracker.<instance>.<job>` とする。`<instance>` は設定ファイルの `instance`（既定 `default`、並行稼働時はバージョン番号など）、`<job>` は `backend` / `frontend` / `fetch` / `summary` |
-| plist・ログ | 展開先配下の `logs/` に出力する。plist は展開時に `instance` を埋め込んで生成する |
+| plist・ログ     | 展開先配下の `logs/` に出力する。plist は展開時に `instance` を埋め込んで生成する                                                                                                                        |
 
 - 同じ DB ファイルを複数バージョンが同時に開かないこと。スキーマの異なるバージョンが同一DBを触るとマイグレーションが衝突するため、DBパスは必ずバージョンごとに分ける。
 - ポートが使用中の場合、起動時にエラーで終了する（自動で別ポートへ退避しない）。
@@ -103,42 +110,42 @@ config/
 
 **feeds**（購読フィード）
 
-| カラム | 型 | 説明 |
-|---|---|---|
-| id | integer PK | |
-| name | text | 表示名 |
-| url | text UNIQUE | フィードURL（同一URLの二重購読を防ぐ） |
-| fetch_interval_minutes | integer NULL | 取得間隔。NULL は設定 `feed.fetch_interval_minutes` を使う |
-| enabled | boolean | 有効/無効（既定 true） |
-| created_at | datetime | |
-| last_fetched_at | datetime NULL | 最終取得日時 |
-| last_fetch_ok | boolean NULL | 最終取得の成否。未取得は NULL |
-| last_fetch_error | text NULL | 最終取得の失敗理由 |
+| カラム                 | 型            | 説明                                                       |
+| ---------------------- | ------------- | ---------------------------------------------------------- |
+| id                     | integer PK    |                                                            |
+| name                   | text          | 表示名                                                     |
+| url                    | text UNIQUE   | フィードURL（同一URLの二重購読を防ぐ）                     |
+| fetch_interval_minutes | integer NULL  | 取得間隔。NULL は設定 `feed.fetch_interval_minutes` を使う |
+| enabled                | boolean       | 有効/無効（既定 true）                                     |
+| created_at             | datetime      |                                                            |
+| last_fetched_at        | datetime NULL | 最終取得日時                                               |
+| last_fetch_ok          | boolean NULL  | 最終取得の成否。未取得は NULL                              |
+| last_fetch_error       | text NULL     | 最終取得の失敗理由                                         |
 
 **articles**（記事）
 
-| カラム | 型 | 説明 |
-|---|---|---|
-| id | integer PK | |
-| feed_id | integer FK → feeds.id | フィード削除時は記事も削除（ON DELETE CASCADE） |
-| guid | text | 記事の同一性キー（5-3 参照） |
-| title | text | |
-| url | text NULL | 記事URL |
-| content | text NULL | フィードが提供する本文または要約 |
-| published_at | datetime NULL | 公開日時 |
-| fetched_at | datetime | 取得日時 |
-| is_read | boolean | 既読フラグ（既定 false） |
-| read_at | datetime NULL | 既読日時 |
+| カラム       | 型                    | 説明                                            |
+| ------------ | --------------------- | ----------------------------------------------- |
+| id           | integer PK            |                                                 |
+| feed_id      | integer FK → feeds.id | フィード削除時は記事も削除（ON DELETE CASCADE） |
+| guid         | text                  | 記事の同一性キー（5-3 参照）                    |
+| title        | text                  |                                                 |
+| url          | text NULL             | 記事URL                                         |
+| content      | text NULL             | フィードが提供する本文または要約                |
+| published_at | datetime NULL         | 公開日時                                        |
+| fetched_at   | datetime              | 取得日時                                        |
+| is_read      | boolean               | 既読フラグ（既定 false）                        |
+| read_at      | datetime NULL         | 既読日時                                        |
 
 **summaries**（サマリ）
 
-| カラム | 型 | 説明 |
-|---|---|---|
-| id | integer PK | |
-| period_start / period_end | datetime | 対象期間 |
-| created_at | datetime | 生成日時 |
-| body | text NULL | 本文。生成前・失敗時は NULL |
-| status | text | `pending` / `running` / `succeeded` / `failed` |
+| カラム                    | 型         | 説明                                           |
+| ------------------------- | ---------- | ---------------------------------------------- |
+| id                        | integer PK |                                                |
+| period_start / period_end | datetime   | 対象期間                                       |
+| created_at                | datetime   | 生成日時                                       |
+| body                      | text NULL  | 本文。生成前・失敗時は NULL                    |
+| status                    | text       | `pending` / `running` / `succeeded` / `failed` |
 
 `body` には `{"overview": 総評, "topics": [{"title", "summary", "article_ids"}]}` のJSONを保存する（トピックごとの元記事は `article_ids`）。対象期間に記事が0件の場合はサマリを生成しない。AIの出力が不正な場合は `status=failed` で記録する。プロンプトは `backend/deep_tracker/summary/prompts/summary.md`。
 
@@ -148,14 +155,14 @@ config/
 
 **ai_jobs**（AIジョブ）
 
-| カラム | 型 | 説明 |
-|---|---|---|
-| id | integer PK | |
-| kind | text | ジョブ種別（例: `summary`） |
-| status | text | `pending` / `running` / `succeeded` / `failed` |
-| input / result | JSON NULL | 入力・結果 |
-| error | text NULL | 失敗理由 |
-| created_at / started_at / finished_at | datetime | started_at・finished_at は NULL 可 |
+| カラム                                | 型         | 説明                                           |
+| ------------------------------------- | ---------- | ---------------------------------------------- |
+| id                                    | integer PK |                                                |
+| kind                                  | text       | ジョブ種別（例: `summary`）                    |
+| status                                | text       | `pending` / `running` / `succeeded` / `failed` |
+| input / result                        | JSON NULL  | 入力・結果                                     |
+| error                                 | text NULL  | 失敗理由                                       |
+| created_at / started_at / finished_at | datetime   | started_at・finished_at は NULL 可             |
 
 `status` は文字列で保持し、取りうる値はアプリ側で検証する（値の追加でマイグレーションを要さないため）。
 
@@ -177,11 +184,11 @@ config/
 
 ### 5-4. 索引
 
-| 索引 | 用途 |
-|---|---|
-| `articles(published_at)` | 新着順の一覧、保存期間による削除 |
+| 索引                              | 用途                                                                           |
+| --------------------------------- | ------------------------------------------------------------------------------ |
+| `articles(published_at)`          | 新着順の一覧、保存期間による削除                                               |
 | `articles(feed_id, published_at)` | フィード別の一覧。`(feed_id, guid)` の一意索引はフィード単位の絞り込みにも効く |
-| `articles(is_read, published_at)` | 未読のみの一覧 |
-| `summary_articles(article_id)` | 記事からサマリへの逆引き |
-| `summaries(period_start)` | サマリ一覧 |
-| `ai_jobs(status, created_at)` | 未処理ジョブの取得 |
+| `articles(is_read, published_at)` | 未読のみの一覧                                                                 |
+| `summary_articles(article_id)`    | 記事からサマリへの逆引き                                                       |
+| `summaries(period_start)`         | サマリ一覧                                                                     |
+| `ai_jobs(status, created_at)`     | 未処理ジョブの取得                                                             |
