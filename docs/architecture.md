@@ -60,6 +60,12 @@
 - タイトルは `document.title` の先頭の件数をクライアント側で付け替え、`<title>` を `MutationObserver` で監視してページ遷移後も再適用する。
 - ファビコンは未読があるとき、`app/icon.svg` と同じ図形に右上のドットを重ねたSVGを `data:` URL で `<link rel="icon">` に追加し、既存のiconは無効化する。0件で元に戻す。
 
+### 2-7. PC表示の画面構成
+
+- `components/AppShell.tsx` が `.app`（縦flex）の先頭に全幅の `.pc-header`（52px）を置き、その下の `.app-body`（横flex、`flex:1; min-height:0`）にサイドバーと `.main-col` を並べる。
+- ヘッダーは `flex:none` で固定し、サイドバーと `.main` が独立してスクロールする。記事一覧の日付見出しの `sticky` の基準は `.main` のまま。
+- 720px未満では `.pc-header` と `.sidebar` を非表示にし、`.mobile-header` / `.bottom-nav` を使う。
+
 ## 3. 複数バージョン並行稼働
 
 バージョン（例: `0.1.0` と `0.2.0`）ごとに展開先ディレクトリを分け、設定ファイルも各展開先に同梱する。バージョン間で衝突する資源は、すべて設定ファイルの値から導出する。

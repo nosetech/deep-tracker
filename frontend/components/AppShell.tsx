@@ -183,101 +183,100 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <ToastProvider>
       <div className="app">
-        <nav className="sidebar" aria-label="メインナビゲーション">
-          <div className="brand">
-            <BrandMark className="brand-mark" />
-            <div className="brand-text">
-              <div className="brand-name">Deep Tracker</div>
-              {version && (
-                <div className="brand-version">
-                  v{version.replace(/^v/, "")}
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="nav-list">
-            {NAV.map((n) => (
-              <Link
-                key={n.key}
-                href={n.href}
-                className={`nav-item${active === n.key ? " is-active" : ""}`}
-                aria-current={active === n.key ? "page" : undefined}
-              >
-                {ICONS[n.key](18)}
-                <span className="nav-label">{n.label}</span>
-                {n.key === "articles" && hasUnread && (
-                  <span className="badge" aria-label="未読件数">
-                    {unread}
-                  </span>
-                )}
-                {n.key === "feeds" && hasError && (
-                  <span
-                    className="err-dot"
-                    title="取得エラーのあるフィードがあります"
-                  />
-                )}
-              </Link>
-            ))}
-          </div>
-          <div className="sidebar-spacer" />
-          <div className="sidebar-foot">
-            <div>最終取得 {formatLastFetch(lastFetch)}</div>
-            {hasError && (
-              <Link href="/feeds" className="foot-err">
-                {errorCount}件のフィードで取得エラー
-              </Link>
+        <header className="pc-header">
+          <BrandMark className="brand-mark" />
+          <div className="brand-text">
+            <div className="brand-name">Deep Tracker</div>
+            {version && (
+              <div className="brand-version">v{version.replace(/^v/, "")}</div>
             )}
           </div>
-        </nav>
-
-        <div className="main-col">
-          <header
-            className={`mobile-header${isDetail ? " mobile-header-detail" : ""}`}
-          >
-            <div className="mobile-left">
-              <div id={MOBILE_BACK_SLOT_ID} className="mobile-back-slot" />
-              <div className="mobile-brand">
-                <BrandMark className="mobile-brand-mark" />
-                <div className="mobile-brand-text">
-                  <div className="mobile-brand-name">Deep Tracker</div>
-                  {version && (
-                    <div className="mobile-brand-version">
-                      v{version.replace(/^v/, "")}
-                    </div>
+          <div className="pc-header-spacer" />
+          <ThemeToggle />
+        </header>
+        <div className="app-body">
+          <nav className="sidebar" aria-label="メインナビゲーション">
+            <div className="nav-list">
+              {NAV.map((n) => (
+                <Link
+                  key={n.key}
+                  href={n.href}
+                  className={`nav-item${active === n.key ? " is-active" : ""}`}
+                  aria-current={active === n.key ? "page" : undefined}
+                >
+                  {ICONS[n.key](18)}
+                  <span className="nav-label">{n.label}</span>
+                  {n.key === "articles" && hasUnread && (
+                    <span className="badge" aria-label="未読件数">
+                      {unread}
+                    </span>
                   )}
+                  {n.key === "feeds" && hasError && (
+                    <span
+                      className="err-dot"
+                      title="取得エラーのあるフィードがあります"
+                    />
+                  )}
+                </Link>
+              ))}
+            </div>
+            <div className="sidebar-spacer" />
+            <div className="sidebar-foot">
+              <div>最終取得 {formatLastFetch(lastFetch)}</div>
+              {hasError && (
+                <Link href="/feeds" className="foot-err">
+                  {errorCount}件のフィードで取得エラー
+                </Link>
+              )}
+            </div>
+          </nav>
+
+          <div className="main-col">
+            <header
+              className={`mobile-header${isDetail ? " mobile-header-detail" : ""}`}
+            >
+              <div className="mobile-left">
+                <div id={MOBILE_BACK_SLOT_ID} className="mobile-back-slot" />
+                <div className="mobile-brand">
+                  <BrandMark className="mobile-brand-mark" />
+                  <div className="mobile-brand-text">
+                    <div className="mobile-brand-name">Deep Tracker</div>
+                    {version && (
+                      <div className="mobile-brand-version">
+                        v{version.replace(/^v/, "")}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
+              <div className="mobile-title">{screenTitle(pathname)}</div>
+              <ThemeToggle className="theme-toggle-mobile" />
+            </header>
+            <div className="main-row">
+              <main className="main">{children}</main>
+              <div id={PREVIEW_SLOT_ID} className="pv-slot" />
             </div>
-            <div className="mobile-title">{screenTitle(pathname)}</div>
-            <ThemeToggle className="theme-toggle-mobile" />
-          </header>
-          <div className="desktop-header">
-            <ThemeToggle />
-          </div>
-          <div className="main-row">
-            <main className="main">{children}</main>
-            <div id={PREVIEW_SLOT_ID} className="pv-slot" />
-          </div>
 
-          <nav className="bottom-nav" aria-label="メインナビゲーション">
-            {NAV.map((n) => (
-              <Link
-                key={n.key}
-                href={n.href}
-                className={`bottom-item${active === n.key ? " is-active" : ""}`}
-                aria-current={active === n.key ? "page" : undefined}
-              >
-                {ICONS[n.key](22)}
-                {n.mobileLabel}
-                {n.key === "articles" && hasUnread && (
-                  <span className="badge-m">{unread}</span>
-                )}
-                {n.key === "feeds" && hasError && (
-                  <span className="err-dot-m" />
-                )}
-              </Link>
-            ))}
-          </nav>
+            <nav className="bottom-nav" aria-label="メインナビゲーション">
+              {NAV.map((n) => (
+                <Link
+                  key={n.key}
+                  href={n.href}
+                  className={`bottom-item${active === n.key ? " is-active" : ""}`}
+                  aria-current={active === n.key ? "page" : undefined}
+                >
+                  {ICONS[n.key](22)}
+                  {n.mobileLabel}
+                  {n.key === "articles" && hasUnread && (
+                    <span className="badge-m">{unread}</span>
+                  )}
+                  {n.key === "feeds" && hasError && (
+                    <span className="err-dot-m" />
+                  )}
+                </Link>
+              ))}
+            </nav>
+          </div>
         </div>
       </div>
     </ToastProvider>
