@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans_JP } from "next/font/google";
 import { AppShell } from "@/components/AppShell";
 import { themeInitScript } from "@/components/theme";
@@ -20,6 +20,10 @@ const plexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "Deep Tracker",
   description: "RSSリーダー + AI要約",
+};
+
+export const viewport: Viewport = {
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
