@@ -73,7 +73,7 @@ RSSリーダー + AIによる要約システム。元ネタは Inkdrop のノー
 
 画面は、サマリ / 記事一覧 / 記事詳細 / 購読フィード管理の4画面（ナビは3項目）。設定画面は設けない。
 
-PC表示（720px以上）は、画面上部に全幅のヘッダー（左: アプリ名・バージョン、右: テーマ切り替え）を置き、その下にサイドバー（ナビ・最終取得・取得エラー）と各画面を横に並べる。ヘッダーは固定で、サイドバーと各画面は独立してスクロールする。モバイルは従来どおり上部ヘッダーと下部ナビ。詳細は Claude Design のデザインと、[design-prompt-ui.md](./design-prompt-ui.md)・[design-prompt-ui-diff-remove-settings.md](./design-prompt-ui-diff-remove-settings.md) を参照。
+PC表示（720px以上）は、画面上部に全幅のヘッダー（左: アプリ名・バージョン、右: テーマ切り替え）を置き、その下にサイドバー（ナビ・最終取得・取得エラー）と各画面を横に並べる。ヘッダーは固定で、サイドバーと各画面は独立してスクロールする。サイドバーは下部のボタンで折りたためる（PCのみ。幅68pxでアイコンのみ。未読あり・取得エラーありはアイコン右上のドットで示す）。折りたたみ中にマウスを乗せる／フォーカスすると、本文に重ねて一時展開する。折りたたみ状態は localStorage に保存し、再読み込み後も保持する。モバイルは従来どおり上部ヘッダーと下部ナビ。詳細は Claude Design のデザインと、[design-prompt-ui.md](./design-prompt-ui.md)・[design-prompt-ui-diff-remove-settings.md](./design-prompt-ui-diff-remove-settings.md) を参照。
 
 ## 7. 未決事項
 

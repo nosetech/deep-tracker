@@ -170,14 +170,57 @@ a:hover {
 }
 
 /* ---- サイドバー（PC） ---- */
-.sidebar {
+/* 外枠（slot）の幅は折りたたみ状態だけで決まり、内側の .sidebar が本文に重なって広がる（一時展開）。
+   折りたたみ状態は hydration 前に付く <html data-sidebar="collapsed"> で決める（初回表示でちらつかない） */
+.sidebar-slot {
   flex: none;
   width: 232px;
+  position: relative;
+  transition: width 0.2s ease;
+}
+
+html[data-sidebar="collapsed"] .sidebar-slot {
+  width: 68px;
+}
+
+.sidebar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  box-sizing: border-box;
+  width: 232px;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   background: var(--surface);
   border-right: 1px solid var(--line);
   padding: 12px 12px 14px;
+  transition:
+    width 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+html[data-sidebar="collapsed"] .sidebar {
+  width: 68px;
+}
+
+html[data-sidebar="collapsed"] .sidebar.is-peek {
+  width: 232px;
+  z-index: 6;
+  box-shadow: 8px 0 28px rgba(0, 0, 0, 0.18);
+}
+
+html[data-theme="dark"][data-sidebar="collapsed"] .sidebar.is-peek {
+  box-shadow: 8px 0 28px rgba(0, 0, 0, 0.45);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-slot,
+  .sidebar {
+    transition: none;
+  }
 }
 
 .brand-mark {
@@ -217,6 +260,8 @@ a:hover {
 }
 
 .nav-item {
+  position: relative;
+  white-space: nowrap;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -239,8 +284,31 @@ a:hover {
   font-weight: 600;
 }
 
+.nav-icon {
+  flex: none;
+  display: flex;
+}
+
 .nav-label {
   flex: 1;
+}
+
+/* 折りたたみ時だけ出す、未読あり／取得エラーありのドット（アイコン右上） */
+.nav-dot {
+  display: none;
+  position: absolute;
+  top: 7px;
+  left: calc(50% + 3px);
+  width: 8px;
+  height: 8px;
+  box-sizing: content-box;
+  border-radius: 50%;
+  background: var(--ac);
+  border: 2px solid var(--surface);
+}
+
+.nav-dot-err {
+  background: var(--err);
 }
 
 .badge {
@@ -275,12 +343,57 @@ a:hover {
   font-size: 12px;
   line-height: 1.7;
   color: var(--tx3);
+  white-space: nowrap;
 }
 
 .foot-err {
   display: block;
   color: var(--err);
   font-size: 12px;
+}
+
+.collapse-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--tx2);
+  font-size: 12.5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.collapse-btn:hover {
+  background: var(--surface2);
+  color: var(--tx);
+}
+
+.collapse-btn svg {
+  flex: none;
+}
+
+/* 折りたたみ中（一時展開していないとき）: アイコンのみ・中央寄せ */
+html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .nav-item,
+html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .collapse-btn {
+  justify-content: center;
+  padding: 0;
+}
+
+html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .nav-label,
+html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .badge,
+html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .err-dot,
+html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .collapse-label,
+html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .sidebar-foot {
+  display: none;
+}
+
+html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .nav-dot {
+  display: block;
 }
 
 /* ---- テーマ切り替え ---- */
@@ -324,7 +437,7 @@ a:hover {
 
 /* ---- モバイル（< 720px） ---- */
 @media (max-width: 719px) {
-  .sidebar,
+  .sidebar-slot,
   .pc-header {
     display: none;
   }
