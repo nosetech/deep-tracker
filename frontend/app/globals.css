@@ -61,6 +61,9 @@
 html,
 body {
   height: 100%;
+  /* ページ自体はスクロールさせない（スクロールは .main のみ） */
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 body {
@@ -96,6 +99,7 @@ a:hover {
   position: relative;
   overflow: hidden;
   height: 100vh;
+  height: 100dvh;
   background: var(--bg);
   color: var(--tx);
 }
@@ -325,19 +329,24 @@ a:hover {
     display: none;
   }
 
+  :root {
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: max(6px, env(safe-area-inset-bottom, 0px));
+  }
+
   .main {
     --main-pad-top: 16px;
-    padding: 16px 16px 80px;
+    padding: 16px 16px calc(74px + var(--safe-bottom));
   }
 
   .mobile-header {
     flex: none;
-    height: 52px;
+    height: calc(52px + var(--safe-top));
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
     gap: 8px;
-    padding: 0 8px 0 12px;
+    padding: var(--safe-top) 8px 0 12px;
     background: var(--surface);
     border-bottom: 1px solid var(--line);
   }
@@ -438,12 +447,12 @@ a:hover {
     left: 0;
     right: 0;
     bottom: 0;
-    height: 64px;
+    height: calc(58px + var(--safe-bottom));
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     background: var(--surface);
     border-top: 1px solid var(--line);
-    padding-bottom: 6px;
+    padding-bottom: var(--safe-bottom);
     z-index: 5;
   }
 
@@ -927,7 +936,7 @@ a:hover {
   .toast-region {
     left: 12px;
     right: 12px;
-    bottom: 76px;
+    bottom: calc(70px + var(--safe-bottom));
     align-items: stretch;
   }
 }
