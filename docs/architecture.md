@@ -64,6 +64,8 @@
 
 - `components/AppShell.tsx` が `.app`（縦flex）の先頭に全幅の `.pc-header`（52px）を置き、その下の `.app-body`（横flex、`flex:1; min-height:0`）にサイドバーと `.main-col` を並べる。
 - ヘッダーは `flex:none` で固定し、サイドバーと `.main` が独立してスクロールする。記事一覧の日付見出しの `sticky` の基準は `.main` のまま。
+- サイドバーは `components/Sidebar.tsx`。外枠 `.sidebar-slot` の幅は折りたたみ状態（232px / 68px）だけで決まり、内側の `.sidebar` が絶対配置で、折りたたみ中のホバー・フォーカス（遅延 140ms / 220ms）では幅だけ広がって本文に重なる（一時展開、影付き）。`width` は `0.2s ease` で遷移し、`prefers-reduced-motion: reduce` では無効。
+- 折りたたみ状態は `localStorage`（キー `deep-tracker.sidebar`、`{"collapsed":true}`）に保存する。ちらつき防止のため、テーマと同様に hydration 前のインラインスクリプト（`lib/sidebar-state.ts` の `sidebarInitScript`）が `<html data-sidebar="collapsed">` を付け、見た目は CSS が属性で決める。保存値は型を検証し、壊れていれば展開に戻す。
 - 720px未満では `.pc-header` と `.sidebar` を非表示にし、`.mobile-header` / `.bottom-nav` を使う。
 
 ### 2-8. モバイルの画面高さ

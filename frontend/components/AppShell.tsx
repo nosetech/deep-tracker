@@ -6,6 +6,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { api } from "@/lib/api/client";
 import { useTabUnreadIndicator, useUnreadCount } from "./useUnreadCount";
 import { ThemeToggle } from "./ThemeToggle";
+import { NAV, ICONS, type NavKey } from "./nav";
+import { Sidebar } from "./Sidebar";
 import { ToastProvider } from "./Toast";
 
 // サマリの元記事プレビューを、main の右隣に差し込む場所
@@ -16,73 +18,6 @@ export const MOBILE_BACK_SLOT_ID = "mobile-back-slot";
 
 export const SHELL_REFRESH_EVENT = "dt:shell-refresh";
 
-type NavKey = "summary" | "articles" | "feeds";
-
-const NAV: { key: NavKey; href: string; label: string; mobileLabel: string }[] =
-  [
-    { key: "summary", href: "/", label: "サマリ", mobileLabel: "サマリ" },
-    {
-      key: "articles",
-      href: "/articles",
-      label: "記事一覧",
-      mobileLabel: "記事",
-    },
-    {
-      key: "feeds",
-      href: "/feeds",
-      label: "購読フィード",
-      mobileLabel: "フィード",
-    },
-  ];
-
-const ICONS: Record<NavKey, (size: number) => ReactNode> = {
-  summary: (s) => (
-    <svg
-      width={s}
-      height={s}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M6 3h9l4 4v14H6z" />
-      <path d="M9.5 11h6M9.5 15h6M9.5 7h3" />
-    </svg>
-  ),
-  articles: (s) => (
-    <svg
-      width={s}
-      height={s}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      aria-hidden="true"
-    >
-      <path d="M4 6h16M4 12h16M4 18h10" />
-    </svg>
-  ),
-  feeds: (s) => (
-    <svg
-      width={s}
-      height={s}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      aria-hidden="true"
-    >
-      <circle cx="6" cy="18" r="1.6" />
-      <path d="M5 11a8 8 0 0 1 8 8M5 4.5A14.5 14.5 0 0 1 19.5 19" />
-    </svg>
-  ),
-};
-
 function activeKey(pathname: string): NavKey {
   if (pathname.startsWith("/articles")) return "articles";
   if (pathname.startsWith("/feeds")) return "feeds";
@@ -92,12 +27,6 @@ function activeKey(pathname: string): NavKey {
 function screenTitle(pathname: string): string {
   if (/^\/articles\/.+/.test(pathname)) return "記事";
   return NAV.find((n) => n.key === activeKey(pathname))!.label;
-}
-
-function formatLastFetch(iso: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
 function BrandMark({ className }: { className: string }) {
@@ -195,41 +124,12 @@ export function AppShell({ children }: { children: ReactNode }) {
           <ThemeToggle />
         </header>
         <div className="app-body">
-          <nav className="sidebar" aria-label="メインナビゲーション">
-            <div className="nav-list">
-              {NAV.map((n) => (
-                <Link
-                  key={n.key}
-                  href={n.href}
-                  className={`nav-item${active === n.key ? " is-active" : ""}`}
-                  aria-current={active === n.key ? "page" : undefined}
-                >
-                  {ICONS[n.key](18)}
-                  <span className="nav-label">{n.label}</span>
-                  {n.key === "articles" && hasUnread && (
-                    <span className="badge" aria-label="未読件数">
-                      {unread}
-                    </span>
-                  )}
-                  {n.key === "feeds" && hasError && (
-                    <span
-                      className="err-dot"
-                      title="取得エラーのあるフィードがあります"
-                    />
-                  )}
-                </Link>
-              ))}
-            </div>
-            <div className="sidebar-spacer" />
-            <div className="sidebar-foot">
-              <div>最終取得 {formatLastFetch(lastFetch)}</div>
-              {hasError && (
-                <Link href="/feeds" className="foot-err">
-                  {errorCount}件のフィードで取得エラー
-                </Link>
-              )}
-            </div>
-          </nav>
+          <Sidebar
+            active={active}
+            unread={unread}
+            errorCount={errorCount}
+            lastFetch={lastFetch}
+          />
 
           <div className="main-col">
             <header
