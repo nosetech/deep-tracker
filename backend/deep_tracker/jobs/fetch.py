@@ -11,7 +11,6 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 import httpx
@@ -19,19 +18,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from deep_tracker.config import ConfigError, Settings, get_settings
-from deep_tracker.config.loader import LOG_DIR
 from deep_tracker.db import Feed, create_db_engine, make_session_factory, upgrade_db
 from deep_tracker.db.models import utcnow
 from deep_tracker.feeds import fetch_and_store
 from deep_tracker.jobs.retention import purge_expired_articles
+from deep_tracker.logging_config import configure_logging
 
 logger = logging.getLogger("deep_tracker.jobs.fetch")
 
 # launchd の起動間隔の揺らぎで、間隔ちょうどのフィードが次回送りにならないための許容幅
 DUE_TOLERANCE = timedelta(seconds=60)
-
-LOG_MAX_BYTES = 1_000_000
-LOG_BACKUP_COUNT = 5
 
 
 class AlreadyRunningError(Exception):
@@ -96,26 +92,6 @@ def lock_path_for(settings: Settings) -> Path:
     return Path(settings.db.path).with_name("fetch.lock")
 
 
-def configure_logging(log_dir: Path = LOG_DIR, filename: str = "fetch.log") -> None:
-    """標準出力とローテーション付きファイル（既定は fetch.log）へ出力する。"""
-    log_dir.mkdir(parents=True, exist_ok=True)
-    fmt = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
-    handlers: list[logging.Handler] = [
-        logging.StreamHandler(sys.stdout),
-        RotatingFileHandler(
-            log_dir / filename,
-            maxBytes=LOG_MAX_BYTES,
-            backupCount=LOG_BACKUP_COUNT,
-            encoding="utf-8",
-        ),
-    ]
-    root = logging.getLogger()
-    root.setLevel(logging.INFO)
-    for h in handlers:
-        h.setFormatter(fmt)
-        root.addHandler(h)
-
-
 def log_report(report: FetchReport) -> None:
     logger.info(
         "取得完了: 有効 %d 件 / 対象 %d 件 / 新規記事 %d 件 / 失敗 %d 件",
@@ -144,7 +120,9 @@ def main(argv: list[str] | None = None) -> int:
         print(settings.instance)
         return 0
 
-    configure_logging()
+    configure_logging(
+        "fetch.log", retention_days=settings.logging.retention_days, console=sys.stdout.isatty()
+    )
     try:
         with single_instance(lock_path_for(settings)):
             upgrade_db(settings)

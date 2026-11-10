@@ -88,6 +88,14 @@
 - 同じ DB ファイルを複数バージョンが同時に開かないこと。スキーマの異なるバージョンが同一DBを触るとマイグレーションが衝突するため、DBパスは必ずバージョンごとに分ける。
 - ポートが使用中の場合、起動時にエラーで終了する（自動で別ポートへ退避しない）。
 
+### ログのローテーション
+
+- `backend.log` / `frontend.log` / `fetch.log` / `summary.log` を、JST 0時に日次ローテーションする（`TimedRotatingFileHandler` のサブクラス `JstMidnightRotatingFileHandler`。0時の判定・世代ファイル名 `*.log.YYYY-MM-DD`・ログ内の時刻をOSのタイムゾーンに依存させずJSTに固定する。`backend/deep_tracker/logging_config.py`）。
+- 保持日数は設定 `logging.retention_days`（既定7、1以上の整数）。超えた世代はハンドラが自動削除する。
+- logging を経由しない出力は、`python -m deep_tracker.log_rotator --path <file>`（標準入力を加工せず書き出すローテータ）へパイプして書き出す。対象は frontend（Next.js）の出力と、backend 本体の標準出力・標準エラー（起動前のクラッシュ・未捕捉例外。`backend.log` と同じパスを2プロセスが開くとローテーションが競合するため `backend.stderr.log` に分ける）。`scripts/start.sh` は `>>` リダイレクトではなくプロセス置換でパイプし、launchd の plist も `StandardOutPath` を使わず `bash -c` で同じパイプを組む。ローテータは書き込みエラー・設定読み込み失敗・不正なUTF-8でも落ちない（落ちると本体が SIGPIPE を受けるため）。
+- `*.launchd.log`（fetch / summary の起動直後のクラッシュ専用）は plist のまま。通常ログは logging 経由で、端末から手動実行したときだけ標準出力にも出す。
+- 動作確認用インスタンス（`scripts/dev-instance.sh`）は `.dev-run/` に出すだけでローテーションしない。
+
 ## 4. 想定ディレクトリ構成
 
 ```

@@ -10,6 +10,8 @@ frontend:
   port: 3700
 db:
   path: data/deep-tracker.db # 相対パスは展開先ディレクトリ基準
+logging:
+  retention_days: 7 # ログの保持日数。JST 0時に日次ローテーションし、超えた世代は自動削除する
 retention:
   days: 365 # 記事の保存期間（日）
 summary:

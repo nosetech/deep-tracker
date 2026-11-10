@@ -20,6 +20,7 @@ def main() -> int:
         return 1
     print(f"INSTANCE={shlex.quote(settings.instance)}")
     print(f"LOG_DIR={shlex.quote(str(LOG_DIR))}")
+    print(f"LOG_RETENTION_DAYS={settings.logging.retention_days}")
     # 未指定ならローカルのみ（127.0.0.1）
     print(f"FRONTEND_HOST={shlex.quote(bind_ip or '127.0.0.1')}")
     print(f"FRONTEND_PUBLIC={'1' if bind_ip else ''}")

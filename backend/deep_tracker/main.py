@@ -1,3 +1,4 @@
+import logging
 import sys
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -47,7 +48,9 @@ app.include_router(summaries.router, prefix="/api")
 
 def main() -> None:
     from deep_tracker.config import ConfigError, get_settings
+    from deep_tracker.config.dev import is_dev_mode
     from deep_tracker.db import upgrade_db
+    from deep_tracker.logging_config import configure_logging
 
     try:
         settings = get_settings()
@@ -55,9 +58,16 @@ def main() -> None:
         # 不正な設定では起動しない
         print(f"設定エラー: {e}", file=sys.stderr)
         sys.exit(1)
+    if is_dev_mode():
+        # 動作確認用インスタンスは運用の logs/ を汚さず、標準出力（.dev-run/ へ出る）に出す
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+    else:
+        configure_logging("backend.log", retention_days=settings.logging.retention_days)
     upgrade_db(settings)
     # バックエンドは常に 127.0.0.1 に bind する（LAN公開はフロントのみ）
-    uvicorn.run("deep_tracker.main:app", host="127.0.0.1", port=settings.backend.port)
+    uvicorn.run(
+        "deep_tracker.main:app", host="127.0.0.1", port=settings.backend.port, log_config=None
+    )
 
 
 if __name__ == "__main__":

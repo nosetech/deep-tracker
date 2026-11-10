@@ -80,8 +80,11 @@ install_service() {
         -e "s|__BACKEND_URL__|${backend_url}|g" \
         "$DEPLOY_ROOT/scripts/com.nosetech.deep-tracker.$svc.plist.example" >"$plist"
     # 配布版は standalone 出力を node で直接起動する（next の CLI は同梱されない）
+    # （ProgramArguments は [bash, -c, script, $0, node, <next>, start, -H, host, -p, port]）
     if [[ "$svc" == frontend ]] && is_standalone; then
-        plutil -replace ProgramArguments -json "[\"${node}\",\"${DEPLOY_ROOT}/frontend/server.js\"]" "$plist"
+        local i
+        for i in 10 9 8 7 6 5; do plutil -remove "ProgramArguments.$i" "$plist"; done
+        plutil -insert ProgramArguments.5 -string "${DEPLOY_ROOT}/frontend/server.js" "$plist"
         plutil -insert EnvironmentVariables.PORT -string "$FRONTEND_PORT" "$plist"
         plutil -insert EnvironmentVariables.HOSTNAME -string "$FRONTEND_HOST" "$plist"
     fi
@@ -132,7 +135,7 @@ install)
     done
     bootstrap_all
     echo "登録しました: backend http://127.0.0.1:$BACKEND_PORT / frontend http://$FRONTEND_HOST:$FRONTEND_PORT"
-    echo "ログ: $LOG_DIR/{backend,frontend}.log"
+    echo "ログ: $LOG_DIR/{backend,backend.stderr,frontend}.log（日次ローテーション）"
     ;;
 uninstall)
     load_config
