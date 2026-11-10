@@ -129,7 +129,7 @@ export default function FeedsPage() {
           err.code === "invalid_url"
             ? "URLの形式が正しくありません。http:// または https:// から始まるURLを入力してください。"
             : (view?.message ??
-                `RSS / Atom として解析できませんでした。${err.message}`),
+                "フィードを追加できませんでした。時間をおいて再度お試しください。"),
         );
         setAddErrCode(view?.code ?? "");
       } else if (err instanceof ApiError && err.code === "duplicate_url") {
@@ -278,6 +278,7 @@ export default function FeedsPage() {
             onChange={(e) => {
               setAddUrl(e.target.value);
               setAddErr("");
+              setAddErrCode("");
             }}
           />
           <button type="submit" className="btn-primary" disabled={addBusy}>

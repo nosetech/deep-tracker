@@ -114,6 +114,7 @@ FETCH_FAILURES = [
     (lambda req: httpx.Response(500), "http_status", 500),
     (_raise(httpx.ReadTimeout("slow")), "timeout", None),
     (_raise(httpx.ConnectError("refused")), "connect", None),
+    (_raise(httpx.TooManyRedirects("loop")), "other", None),
 ]
 
 

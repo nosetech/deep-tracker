@@ -78,15 +78,18 @@ def _error(status: int, code: str, message: str, **extra: object) -> HTTPExcepti
 def _fetch_failed(exc: httpx.HTTPError) -> HTTPException:
     """取得の失敗（接続失敗・タイムアウト・HTTPエラー）を fetch_failed にする。
 
-    reason は http_status / timeout / connect のいずれか。HTTPエラーのときは http_status に
+    reason は http_status / timeout / connect / other のいずれか。HTTPエラーのときは http_status に
     ステータスコードを入れる（画面が429などに応じた案内を出し分けるため）。
     """
     if isinstance(exc, httpx.HTTPStatusError):
         reason, status = "http_status", exc.response.status_code
     elif isinstance(exc, httpx.TimeoutException):
         reason, status = "timeout", None
-    else:
+    elif isinstance(exc, httpx.ConnectError):
         reason, status = "connect", None
+    else:
+        # リダイレクトの繰り返し・応答の途中切断など
+        reason, status = "other", None
     return _error(422, ERROR_FETCH_FAILED, describe_error(exc), reason=reason, http_status=status)
 
 
