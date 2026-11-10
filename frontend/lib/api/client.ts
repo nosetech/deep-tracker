@@ -92,7 +92,10 @@ export const api = {
     }
     return request<ArticleList>(`/articles?${params}`);
   },
-  getArticle: (id: number) => request<ArticleDetail>(`/articles/${id}`),
+  getArticle: (id: number, opts: { unreadOnly?: boolean } = {}) =>
+    request<ArticleDetail>(
+      `/articles/${id}${opts.unreadOnly ? "?unread_only=true" : ""}`,
+    ),
   setArticleRead: (id: number, isRead: boolean) =>
     request<ReadState>(`/articles/${id}/read`, {
       method: "PATCH",
