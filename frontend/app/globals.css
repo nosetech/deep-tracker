@@ -135,7 +135,9 @@ a:hover {
   position: relative;
 }
 
+/* ページ内容の上限幅。デザインのページ全体の上限1600px（左右paddingの44pxずつを含む）から逆算。超ワイドでも中央寄せにせず左寄せ */
 .main {
+  --page-max: 1512px;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -623,7 +625,7 @@ html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .nav-dot {
 
 /* ---- 購読フィード画面 ---- */
 .feeds-page {
-  max-width: 1040px;
+  max-width: var(--page-max);
 }
 
 .feeds-title {
@@ -1146,7 +1148,7 @@ html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .nav-dot {
 
 /* ---- 記事一覧画面 ---- */
 .articles-page {
-  max-width: 920px;
+  max-width: var(--page-max);
 }
 
 .articles-title {
@@ -1509,8 +1511,7 @@ html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .nav-dot {
 
 /* ---- 記事詳細画面 ---- */
 .art-detail {
-  max-width: 720px;
-  margin: 0 auto;
+  max-width: var(--page-max);
 }
 
 .det-back {
@@ -1723,7 +1724,7 @@ html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .nav-dot {
 
 /* 読み込み中（スケルトン） */
 .skel {
-  max-width: 860px;
+  max-width: var(--page-max);
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -1876,6 +1877,7 @@ html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .nav-dot {
 
 /* ---- サマリ画面 ---- */
 .sum-page {
+  max-width: var(--page-max);
   display: flex;
   gap: 40px;
   align-items: flex-start;
@@ -1885,7 +1887,6 @@ html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .nav-dot {
 .sum-main {
   flex: 1 1 560px;
   min-width: 0;
-  max-width: 760px;
 }
 
 .sum-head {
