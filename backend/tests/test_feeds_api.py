@@ -100,13 +100,37 @@ def test_add_not_a_feed(client, handler, factory):
         assert s.scalar(select(func.count()).select_from(Feed)) == 0
 
 
-def test_add_unreachable(client, handler):
-    handler.fn = lambda req: httpx.Response(404)
+def _raise(exc):
+    def fn(req):
+        raise exc
+
+    return fn
+
+
+FETCH_FAILURES = [
+    (lambda req: httpx.Response(429), "http_status", 429),
+    (lambda req: httpx.Response(403), "http_status", 403),
+    (lambda req: httpx.Response(404), "http_status", 404),
+    (lambda req: httpx.Response(500), "http_status", 500),
+    (_raise(httpx.ReadTimeout("slow")), "timeout", None),
+    (_raise(httpx.ConnectError("refused")), "connect", None),
+    (_raise(httpx.TooManyRedirects("loop")), "other", None),
+]
+
+
+@pytest.mark.parametrize(("fn", "reason", "status"), FETCH_FAILURES)
+def test_add_fetch_failed(client, handler, factory, fn, reason, status):
+    handler.fn = fn
     res = add(client, "https://example.com/missing")
     assert res.status_code == 422
     detail = res.json()["detail"]
-    assert detail["code"] == "not_a_feed"
-    assert "404" in detail["message"]
+    assert detail["code"] == "fetch_failed"
+    assert detail["reason"] == reason
+    assert detail["http_status"] == status
+    if status:
+        assert str(status) in detail["message"]
+    with factory() as s:
+        assert s.scalar(select(func.count()).select_from(Feed)) == 0
 
 
 def test_list_with_counts(client, factory):
@@ -263,13 +287,13 @@ def test_update_url_duplicate(client, factory):
 
 
 @pytest.mark.parametrize(
-    "fn",
+    ("fn", "code"),
     [
-        lambda req: httpx.Response(200, content=b"<html>not a feed</html>"),
-        lambda req: httpx.Response(404),
+        (lambda req: httpx.Response(200, content=b"<html>not a feed</html>"), "not_a_feed"),
+        *[(fn, "fetch_failed") for fn, _, _ in FETCH_FAILURES],
     ],
 )
-def test_update_url_not_a_feed(client, factory, handler, fn):
+def test_update_url_failure(client, factory, handler, fn, code):
     feed_id = add(client).json()["id"]
     with factory() as s:
         s.get(Feed, feed_id).etag = "keep"
@@ -277,7 +301,7 @@ def test_update_url_not_a_feed(client, factory, handler, fn):
     handler.fn = fn
     res = client.patch(f"/api/feeds/{feed_id}", json={"url": NEW_URL, "name": "変えない"})
     assert res.status_code == 422
-    assert res.json()["detail"]["code"] == "not_a_feed"
+    assert res.json()["detail"]["code"] == code
     with factory() as s:
         feed = s.get(Feed, feed_id)
         assert feed.url == AWS_URL

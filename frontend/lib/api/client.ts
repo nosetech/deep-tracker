@@ -20,6 +20,9 @@ export class ApiError extends Error {
     readonly status: number,
     message: string,
     readonly code?: string,
+    // fetch_failed のとき: http_status / timeout / connect と、HTTPステータス
+    readonly reason?: string,
+    readonly httpStatus?: number | null,
   ) {
     super(message);
   }
@@ -32,16 +35,21 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     let code: string | undefined;
+    let reason: string | undefined;
+    let httpStatus: number | null | undefined;
     let message = `API error: ${res.status} ${path}`;
     try {
       const body = await res.json();
       if (body?.detail?.code) code = body.detail.code;
+      if (typeof body?.detail?.reason === "string") reason = body.detail.reason;
+      if (typeof body?.detail?.http_status === "number")
+        httpStatus = body.detail.http_status;
       if (typeof body?.detail?.message === "string")
         message = body.detail.message;
     } catch {
       // 本文なし・JSON以外はステータスのみで扱う
     }
-    throw new ApiError(res.status, message, code);
+    throw new ApiError(res.status, message, code, reason, httpStatus);
   }
   if (res.status === 204) {
     return undefined as T;
@@ -84,7 +92,10 @@ export const api = {
     }
     return request<ArticleList>(`/articles?${params}`);
   },
-  getArticle: (id: number) => request<ArticleDetail>(`/articles/${id}`),
+  getArticle: (id: number, opts: { unreadOnly?: boolean } = {}) =>
+    request<ArticleDetail>(
+      `/articles/${id}${opts.unreadOnly ? "?unread_only=true" : ""}`,
+    ),
   setArticleRead: (id: number, isRead: boolean) =>
     request<ReadState>(`/articles/${id}/read`, {
       method: "PATCH",

@@ -61,6 +61,9 @@
 html,
 body {
   height: 100%;
+  /* ページ自体はスクロールさせない（スクロールは .main のみ） */
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 body {
@@ -92,11 +95,36 @@ a:hover {
 /* ---- レイアウト ---- */
 .app {
   display: flex;
+  flex-direction: column;
   position: relative;
   overflow: hidden;
   height: 100vh;
+  height: 100dvh;
   background: var(--bg);
   color: var(--tx);
+}
+
+/* PC: 全幅ヘッダーの下に、サイドバーと各画面を横に並べる */
+.pc-header {
+  flex: none;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.pc-header-spacer {
+  flex: 1;
+}
+
+.app-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  position: relative;
 }
 
 .main-col {
@@ -107,7 +135,9 @@ a:hover {
   position: relative;
 }
 
+/* ページ内容の上限幅。デザインのページ全体の上限1600px（左右paddingの44pxずつを含む）から逆算。超ワイドでも中央寄せにせず左寄せ */
 .main {
+  --page-max: 1512px;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -142,21 +172,57 @@ a:hover {
 }
 
 /* ---- サイドバー（PC） ---- */
-.sidebar {
+/* 外枠（slot）の幅は折りたたみ状態だけで決まり、内側の .sidebar が本文に重なって広がる（一時展開）。
+   折りたたみ状態は hydration 前に付く <html data-sidebar="collapsed"> で決める（初回表示でちらつかない） */
+.sidebar-slot {
   flex: none;
   width: 232px;
+  position: relative;
+  transition: width 0.2s ease;
+}
+
+html[data-sidebar="collapsed"] .sidebar-slot {
+  width: 68px;
+}
+
+.sidebar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  box-sizing: border-box;
+  width: 232px;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   background: var(--surface);
   border-right: 1px solid var(--line);
-  padding: 18px 12px 14px;
+  padding: 12px 12px 14px;
+  transition:
+    width 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 2px 10px 22px;
+html[data-sidebar="collapsed"] .sidebar {
+  width: 68px;
+}
+
+html[data-sidebar="collapsed"] .sidebar.is-peek {
+  width: 232px;
+  z-index: 6;
+  box-shadow: 8px 0 28px rgba(0, 0, 0, 0.18);
+}
+
+html[data-theme="dark"][data-sidebar="collapsed"] .sidebar.is-peek {
+  box-shadow: 8px 0 28px rgba(0, 0, 0, 0.45);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-slot,
+  .sidebar {
+    transition: none;
+  }
 }
 
 .brand-mark {
@@ -196,6 +262,8 @@ a:hover {
 }
 
 .nav-item {
+  position: relative;
+  white-space: nowrap;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -218,8 +286,31 @@ a:hover {
   font-weight: 600;
 }
 
+.nav-icon {
+  flex: none;
+  display: flex;
+}
+
 .nav-label {
   flex: 1;
+}
+
+/* 折りたたみ時だけ出す、未読あり／取得エラーありのドット（アイコン右上） */
+.nav-dot {
+  display: none;
+  position: absolute;
+  top: 7px;
+  left: calc(50% + 3px);
+  width: 8px;
+  height: 8px;
+  box-sizing: content-box;
+  border-radius: 50%;
+  background: var(--ac);
+  border: 2px solid var(--surface);
+}
+
+.nav-dot-err {
+  background: var(--err);
 }
 
 .badge {
@@ -254,6 +345,7 @@ a:hover {
   font-size: 12px;
   line-height: 1.7;
   color: var(--tx3);
+  white-space: nowrap;
 }
 
 .foot-err {
@@ -262,17 +354,51 @@ a:hover {
   font-size: 12px;
 }
 
-/* ---- ヘッダー・テーマ切り替え ---- */
-.desktop-header {
-  flex: none;
-  height: 44px;
+.collapse-btn {
+  width: 100%;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  padding: 0 16px;
-  background: var(--bg);
+  gap: 10px;
+  height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--tx2);
+  font-size: 12.5px;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
+.collapse-btn:hover {
+  background: var(--surface2);
+  color: var(--tx);
+}
+
+.collapse-btn svg {
+  flex: none;
+}
+
+/* 折りたたみ中（一時展開していないとき）: アイコンのみ・中央寄せ */
+html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .nav-item,
+html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .collapse-btn {
+  justify-content: center;
+  padding: 0;
+}
+
+html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .nav-label,
+html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .badge,
+html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .err-dot,
+html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .collapse-label,
+html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .sidebar-foot {
+  display: none;
+}
+
+html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .nav-dot {
+  display: block;
+}
+
+/* ---- テーマ切り替え ---- */
 .theme-toggle {
   width: 28px;
   height: 28px;
@@ -313,24 +439,29 @@ a:hover {
 
 /* ---- モバイル（< 720px） ---- */
 @media (max-width: 719px) {
-  .sidebar,
-  .desktop-header {
+  .sidebar-slot,
+  .pc-header {
     display: none;
+  }
+
+  :root {
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: max(6px, env(safe-area-inset-bottom, 0px));
   }
 
   .main {
     --main-pad-top: 16px;
-    padding: 16px 16px 80px;
+    padding: 16px 16px calc(74px + var(--safe-bottom));
   }
 
   .mobile-header {
     flex: none;
-    height: 52px;
+    height: calc(52px + var(--safe-top));
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
     gap: 8px;
-    padding: 0 8px 0 12px;
+    padding: var(--safe-top) 8px 0 12px;
     background: var(--surface);
     border-bottom: 1px solid var(--line);
   }
@@ -431,12 +562,12 @@ a:hover {
     left: 0;
     right: 0;
     bottom: 0;
-    height: 64px;
+    height: calc(58px + var(--safe-bottom));
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     background: var(--surface);
     border-top: 1px solid var(--line);
-    padding-bottom: 6px;
+    padding-bottom: var(--safe-bottom);
     z-index: 5;
   }
 
@@ -494,7 +625,7 @@ a:hover {
 
 /* ---- 購読フィード画面 ---- */
 .feeds-page {
-  max-width: 1040px;
+  max-width: var(--page-max);
 }
 
 .feeds-title {
@@ -569,6 +700,19 @@ a:hover {
 
 .feed-add-err span {
   text-wrap: pretty;
+}
+
+.feed-add-err-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.feed-add-err-code {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--tx2);
 }
 
 .feed-add-hint {
@@ -920,7 +1064,7 @@ a:hover {
   .toast-region {
     left: 12px;
     right: 12px;
-    bottom: 76px;
+    bottom: calc(70px + var(--safe-bottom));
     align-items: stretch;
   }
 }
@@ -1004,7 +1148,7 @@ a:hover {
 
 /* ---- 記事一覧画面 ---- */
 .articles-page {
-  max-width: 920px;
+  max-width: var(--page-max);
 }
 
 .articles-title {
@@ -1367,8 +1511,7 @@ a:hover {
 
 /* ---- 記事詳細画面 ---- */
 .art-detail {
-  max-width: 720px;
-  margin: 0 auto;
+  max-width: var(--page-max);
 }
 
 .det-back {
@@ -1524,13 +1667,88 @@ a:hover {
   color: var(--tx2);
 }
 
+.det-navwrap {
+  margin-top: 40px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.det-nav-head {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.det-nav-scope {
+  font-size: 11.5px;
+  color: var(--tx3);
+}
+
+.det-nav-seg {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  background: var(--surface2);
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  height: 34px;
+}
+
+.det-nav-seg button {
+  flex: 1;
+  white-space: nowrap;
+  border: 0;
+  border-radius: 6px;
+  padding: 0 12px;
+  cursor: pointer;
+  font-size: 13px;
+  background: transparent;
+  color: var(--tx2);
+  font-weight: 500;
+}
+
+.det-nav-seg button.is-on {
+  background: var(--surface);
+  color: var(--tx);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(20, 22, 30, 0.12);
+}
+
 .det-nav {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 10px;
-  margin-top: 40px;
-  padding-top: 18px;
-  border-top: 1px solid var(--line);
+}
+
+.det-nav-empty {
+  height: 100%;
+  border: 1px dashed var(--line2);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  justify-content: center;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.det-nav-empty.is-right {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.det-nav-showall {
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--ac);
 }
 
 .det-nav-btn {
@@ -1566,6 +1784,15 @@ a:hover {
 }
 
 @media (max-width: 719px) {
+  .det-nav-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .det-nav-seg {
+    width: 100%;
+  }
+
   .det-back {
     display: none;
   }
@@ -1581,7 +1808,7 @@ a:hover {
 
 /* 読み込み中（スケルトン） */
 .skel {
-  max-width: 860px;
+  max-width: var(--page-max);
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -1734,6 +1961,7 @@ a:hover {
 
 /* ---- サマリ画面 ---- */
 .sum-page {
+  max-width: var(--page-max);
   display: flex;
   gap: 40px;
   align-items: flex-start;
@@ -1743,7 +1971,6 @@ a:hover {
 .sum-main {
   flex: 1 1 560px;
   min-width: 0;
-  max-width: 760px;
 }
 
 .sum-head {

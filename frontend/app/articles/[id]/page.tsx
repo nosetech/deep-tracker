@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   MOBILE_BACK_SLOT_ID,
@@ -11,11 +11,34 @@ import { useToast } from "@/components/Toast";
 import { ApiErrorPanel, LoadingSkeleton } from "@/components/states";
 import { api } from "@/lib/api/client";
 import { formatFull } from "@/lib/format";
+import {
+  NAV_SCOPE_STORAGE_KEY,
+  parseUnreadOnly,
+  serializeUnreadOnly,
+} from "@/lib/nav-scope";
 import { sanitizeHtml } from "@/lib/sanitize";
 import type { ArticleDetail } from "@/lib/api/types";
 
 function refreshShell() {
   window.dispatchEvent(new Event(SHELL_REFRESH_EVENT));
+}
+
+// 「未読のみ」で前後に未読の記事がないときの表示
+function NavEmpty({
+  align,
+  onShowAll,
+}: {
+  align: "left" | "right";
+  onShowAll: () => void;
+}) {
+  return (
+    <div className={`det-nav-empty is-${align}`}>
+      <span className="det-nav-label">未読の記事はありません</span>
+      <button type="button" className="det-nav-showall" onClick={onShowAll}>
+        すべての記事を表示
+      </button>
+    </div>
+  );
 }
 
 export default function ArticleDetailPage() {
@@ -27,6 +50,56 @@ export default function ArticleDetailPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [error, setError] = useState<"notfound" | "failed" | null>(null);
 
+  // 前後記事の対象（未読のみ／すべて）。端末単位で localStorage に保持する
+  const [unreadOnly, setUnreadOnly] = useState(() => {
+    if (typeof window === "undefined") return true;
+    try {
+      return parseUnreadOnly(localStorage.getItem(NAV_SCOPE_STORAGE_KEY));
+    } catch {
+      return true;
+    }
+  });
+  const unreadOnlyRef = useRef(unreadOnly);
+  useEffect(() => {
+    unreadOnlyRef.current = unreadOnly;
+  }, [unreadOnly]);
+
+  const changeScope = (next: boolean) => {
+    setUnreadOnly(next);
+    try {
+      localStorage.setItem(NAV_SCOPE_STORAGE_KEY, serializeUnreadOnly(next));
+    } catch {
+      // 保存できなくても、この画面内では切り替えられる
+    }
+  };
+
+  // 切り替え時は前後記事だけ取り直す（本文の再読み込みも既読化の再実行もしない）
+  const mounted = useRef(false);
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
+    if (!Number.isInteger(id)) return;
+    let cancelled = false;
+    api
+      .getArticle(id, { unreadOnly })
+      .then((a) => {
+        if (cancelled) return;
+        setArticle((cur) =>
+          cur && cur.id === a.id
+            ? { ...cur, newer: a.newer, older: a.older }
+            : cur,
+        );
+      })
+      .catch(() => {
+        // 取得に失敗したら、直前の前後記事の表示を維持する
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [unreadOnly, id]);
+
   useEffect(() => {
     let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -37,7 +110,7 @@ export default function ArticleDetailPage() {
       return;
     }
     api
-      .getArticle(id)
+      .getArticle(id, { unreadOnly: unreadOnlyRef.current })
       .then(async (a) => {
         if (cancelled) return;
         setArticle(a);
@@ -242,30 +315,66 @@ export default function ArticleDetailPage() {
           <p className="det-nobody">本文はフィードに含まれていません。</p>
         )}
       </div>
-      <div className="det-nav">
-        <div>
-          {article.newer && (
-            <button
-              type="button"
-              className="det-nav-btn"
-              onClick={() => goAdjacent(article.newer!.id)}
-            >
-              <span className="det-nav-label">← 新しい記事</span>
-              <span className="det-nav-title">{article.newer.title}</span>
-            </button>
-          )}
+      <div className="det-navwrap">
+        <div className="det-nav-head">
+          <span className="det-nav-scope">前後の記事</span>
+          <div
+            className="det-nav-seg"
+            role="tablist"
+            aria-label="前後の記事の対象"
+          >
+            {(
+              [
+                [true, "未読のみ"],
+                [false, "すべて"],
+              ] as const
+            ).map(([v, label]) => (
+              <button
+                key={label}
+                type="button"
+                role="tab"
+                aria-selected={unreadOnly === v}
+                className={unreadOnly === v ? "is-on" : ""}
+                onClick={() => changeScope(v)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
-        <div>
-          {article.older && (
-            <button
-              type="button"
-              className="det-nav-btn det-nav-older"
-              onClick={() => goAdjacent(article.older!.id)}
-            >
-              <span className="det-nav-label">古い記事 →</span>
-              <span className="det-nav-title">{article.older.title}</span>
-            </button>
-          )}
+        <div className="det-nav">
+          <div>
+            {article.newer ? (
+              <button
+                type="button"
+                className="det-nav-btn"
+                onClick={() => goAdjacent(article.newer!.id)}
+              >
+                <span className="det-nav-label">← 新しい記事</span>
+                <span className="det-nav-title">{article.newer.title}</span>
+              </button>
+            ) : (
+              unreadOnly && (
+                <NavEmpty align="left" onShowAll={() => changeScope(false)} />
+              )
+            )}
+          </div>
+          <div>
+            {article.older ? (
+              <button
+                type="button"
+                className="det-nav-btn det-nav-older"
+                onClick={() => goAdjacent(article.older!.id)}
+              >
+                <span className="det-nav-label">古い記事 →</span>
+                <span className="det-nav-title">{article.older.title}</span>
+              </button>
+            ) : (
+              unreadOnly && (
+                <NavEmpty align="right" onShowAll={() => changeScope(false)} />
+              )
+            )}
+          </div>
         </div>
       </div>
     </div>

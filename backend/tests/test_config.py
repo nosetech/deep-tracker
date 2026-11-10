@@ -59,6 +59,15 @@ def test_relative_db_path_resolved_to_deploy_root(tmp_path):
     assert s.db.path == str(loader.DEPLOY_ROOT / "data/a.db")
 
 
+def test_backup_defaults_and_path_resolution(tmp_path):
+    s = load_settings(write(tmp_path, ""))
+    assert s.backup.retention_days == 30
+    assert s.backup.dir == str(Path("~/Backups/deep-tracker").expanduser())
+    s = load_settings(write(tmp_path, "backup: {dir: bk, retention_days: 7}\n"))
+    assert s.backup.dir == str(loader.DEPLOY_ROOT / "bk")
+    assert s.backup.retention_days == 7
+
+
 def test_empty_file_uses_defaults(tmp_path):
     assert load_settings(write(tmp_path, "")).retention.days == 365
 
@@ -75,6 +84,11 @@ def test_empty_file_uses_defaults(tmp_path):
         ("feed: {fetch_interval_minutes: abc}", "feed.fetch_interval_minutes"),
         ("ai: {command: ''}", "ai.command"),
         ("instance: 'a b'", "instance"),
+        ("backup: {retention_days: 0}", "backup.retention_days"),
+        ("backup: {retention_days: -1}", "backup.retention_days"),
+        ("backup: {retention_days: abc}", "backup.retention_days"),
+        ("backup: {dir: ''}", "backup.dir"),
+        ("backup: {path: x}", "backup.path"),
     ],
 )
 def test_invalid_values(tmp_path, text, key):
@@ -158,6 +172,7 @@ def test_launch_settings_output(monkeypatch, tmp_path, capsys):
     assert capsys.readouterr().out.splitlines() == [
         "INSTANCE=default",
         f"LOG_DIR={loader.LOG_DIR}",
+        "LOG_RETENTION_DAYS=7",
         "FRONTEND_HOST=127.0.0.1",
         "FRONTEND_PUBLIC=",
         "FRONTEND_PORT=3710",

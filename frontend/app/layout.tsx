@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans_JP } from "next/font/google";
 import { AppShell } from "@/components/AppShell";
 import { themeInitScript } from "@/components/theme";
+import { sidebarInitScript } from "@/lib/sidebar-state";
 import "./globals.css";
 
 const plexSans = IBM_Plex_Sans_JP({
@@ -22,6 +23,10 @@ export const metadata: Metadata = {
   description: "RSSリーダー + AI要約",
 };
 
+export const viewport: Viewport = {
+  viewportFit: "cover",
+};
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     // data-theme は下のインラインスクリプトが hydration 前に設定する
@@ -32,6 +37,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <script dangerouslySetInnerHTML={{ __html: sidebarInitScript }} />
       </head>
       <body>
         <AppShell>{children}</AppShell>

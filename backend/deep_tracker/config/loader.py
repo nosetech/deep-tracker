@@ -66,6 +66,10 @@ def load_settings(path: Path | None = None) -> Settings:
     db_path = Path(settings.db.path).expanduser()
     if not db_path.is_absolute():
         settings.db.path = str(DEPLOY_ROOT / db_path)
+    backup_dir = Path(settings.backup.dir).expanduser()
+    if not backup_dir.is_absolute():
+        backup_dir = DEPLOY_ROOT / backup_dir
+    settings.backup.dir = str(backup_dir)
     return settings
 
 

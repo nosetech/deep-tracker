@@ -36,6 +36,7 @@ cp config/config.yaml.example config/config.yaml
 | 項目 | 内容 |
 |---|---|
 | `summary.interval` | サマリの周期（`daily` / `weekly` / `monthly`） |
+| `backup.dir` / `backup.retention_days` | DBバックアップの保存先（既定 `~/Backups/deep-tracker`）と保持日数（既定30） |
 | `feed.fetch_interval_minutes` | フィード取得の既定間隔（分） |
 | `retention.days` | 記事の保存期間（日） |
 | `slack.enabled` / `slack.webhook_url` | Slack通知の有効化とWebhook URL |
@@ -48,7 +49,7 @@ scripts/start.sh   # backend と frontend をバックグラウンドで起動�
 scripts/stop.sh    # 両方を停止
 ```
 
-backend は `127.0.0.1:8700`、frontend は既定で `127.0.0.1`、ポートは `config.yaml` の `frontend.port` で待ち受ける。ログは `logs/` に出る。
+backend は `127.0.0.1:8700`、frontend は既定で `127.0.0.1`、ポートは `config.yaml` の `frontend.port` で待ち受ける。ログは `logs/` に出る。JST 0時に日次ローテーションし、`config.yaml` の `logging.retention_days`（既定7日）を超えた世代は自動削除される。
 
 ブラウザで <http://localhost:3700> を開く（`frontend.port` を変えた場合はそのポート）。
 
@@ -75,11 +76,12 @@ scripts/service.sh uninstall  # 解除
 
 ### 定期実行
 
-フィード取得とサマリ生成は、launchdに登録すると自動で実行される。
+フィード取得・サマリ生成・DBバックアップは、launchdに登録すると自動で実行される。
 
 ```sh
 scripts/fetch-job.sh install     # フィードの定期取得
 scripts/summary-job.sh install   # サマリの定期生成
+scripts/backup-job.sh install    # DBの日次バックアップ（毎日3:00）
 ```
 
 登録・操作・ログの詳細は [docs/setup.md](docs/setup.md) を参照。
