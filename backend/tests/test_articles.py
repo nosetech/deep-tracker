@@ -117,6 +117,22 @@ def test_detail_neighbors(client, data):
     assert client.get("/api/articles/99999").status_code == 404
 
 
+def test_detail_neighbors_unread_only(client, data):
+    # 現在の記事(a2)が既読でも、その位置から見た未読の前後を返す。既読の記事は飛ばす
+    for key in ("a2", "a3"):
+        client.patch(f"/api/articles/{data[key]}/read", json={"is_read": True})
+    res = client.get(f"/api/articles/{data['a2']}", params={"unread_only": True}).json()
+    assert res["newer"]["id"] == data["a4"]  # a3(既読)を飛ばす
+    assert res["older"]["title"] == "Beta 1"
+    # 前後の未読がなくなれば None
+    client.patch(f"/api/articles/{data['a4']}/read", json={"is_read": True})
+    res = client.get(f"/api/articles/{data['a2']}", params={"unread_only": True}).json()
+    assert res["newer"] is None
+    # unread_only なしなら従来どおり既読も含む
+    res = client.get(f"/api/articles/{data['a2']}").json()
+    assert res["newer"]["title"] == "Alpha 3"
+
+
 def test_set_read_and_unread(client, data):
     url = f"/api/articles/{data['a0']}/read"
     res = client.patch(url, json={"is_read": True}).json()
