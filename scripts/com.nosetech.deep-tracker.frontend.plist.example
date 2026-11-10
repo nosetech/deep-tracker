@@ -15,6 +15,10 @@
     <string>com.nosetech.deep-tracker.__INSTANCE__.frontend</string>
     <key>ProgramArguments</key>
     <array>
+        <string>/bin/bash</string>
+        <string>-c</string>
+        <string>exec "$@" &gt; &gt;(cd "__DEPLOY_ROOT__/backend" &amp;&amp; exec "__DEPLOY_ROOT__/backend/.venv/bin/python" -m deep_tracker.log_rotator --path "__DEPLOY_ROOT__/logs/frontend.log") 2&gt;&amp;1</string>
+        <string>deep-tracker-frontend</string>
         <string>__NODE__</string>
         <string>__DEPLOY_ROOT__/frontend/node_modules/next/dist/bin/next</string>
         <string>start</string>
@@ -41,9 +45,9 @@
     <true/>
     <key>ThrottleInterval</key>
     <integer>10</integer>
-    <key>StandardOutPath</key>
-    <string>__DEPLOY_ROOT__/logs/frontend.log</string>
-    <key>StandardErrorPath</key>
-    <string>__DEPLOY_ROOT__/logs/frontend.log</string>
+    <!-- 標準出力・標準エラーは deep_tracker.log_rotator へパイプし、JST 0時に日次ローテーションする
+         （保持日数は config.yaml の logging.retention_days）。StandardOutPath へ直接出すとローテーション
+         されず肥大化するため使わない。bash が本体へ exec するので、launchd が追跡・停止するのは本体のPID。
+         本体が終了するとパイプが閉じ、ローテータも終了する。KeepAlive の再起動時は新しいローテータが起動する。 -->
 </dict>
 </plist>

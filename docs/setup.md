@@ -17,7 +17,7 @@ scripts/stop.sh                # 両方を停止（未起動でもエラーに�
 ```
 
 - `scripts/start.sh` は frontend が未ビルドなら自動で `npm run build` する。`/api/*` の中継先（`BACKEND_URL`）は実行時に読まれるため、`backend.port` を変えてもビルドし直しは不要開発サーバで起動するには `FRONTEND_MODE=dev scripts/start.sh`
-- PID は `logs/deep-tracker.<instance>.{backend,frontend}.pid`、ログは `logs/{backend,frontend}.log` に出る。`instance` ごとにPIDが分かれるため、展開先を分ければ並行稼働できる
+- PID は `logs/deep-tracker.<instance>.{backend,frontend}.pid`、ログは `logs/{backend,backend.stderr,frontend}.log` に出る（[ログ](#6-ログ)の日次ローテーションを参照）。`instance` ごとにPIDが分かれるため、展開先を分ければ並行稼働できる
 - 二重起動は拒否される。異常終了でPIDファイルが残っていても、次の `scripts/start.sh` は起動できる
 
 | 設定 | 動作 |
@@ -77,7 +77,7 @@ scripts/service.sh install     # LAN公開する場合は LAN_IP=192.168.0.10 sc
 
 ## 4. ログ
 
-`logs/backend.log` / `logs/frontend.log`（`scripts/start.sh` と同じ場所）。
+`logs/backend.log` / `logs/backend.stderr.log` / `logs/frontend.log`（`scripts/start.sh` と同じ場所。ローテーションは下記「6. ログ」と同じ）。launchd の plist も `StandardOutPath` へ直接出さず、`bash -c` 経由でローテータへパイプする。
 
 ## 5. 注意
 
@@ -138,8 +138,18 @@ DBを分けていれば互いに干渉しない。
 
 | ファイル | 内容 |
 |---|---|
-| `logs/fetch.log` | バッチの実行結果。1回ごとに「有効・対象・新規記事・失敗」の件数と、失敗したフィードのURL・原因を記録する。1MBで5世代までローテーションする |
-| `logs/fetch.launchd.log` | ログ設定前のクラッシュなど、launchd が受け取った標準出力・標準エラー |
+| `logs/fetch.log` | バッチの実行結果。1回ごとに「有効・対象・新規記事・失敗」の件数と、失敗したフィードのURL・原因を記録する |
+| `logs/fetch.launchd.log` | ログ設定前のクラッシュなど、launchd が受け取った標準出力・標準エラー（通常は空に近く、肥大化しない） |
+| `logs/backend.log` | backend（uvicorn 含む）のログ |
+| `logs/backend.stderr.log` | backend の標準出力・標準エラー（起動前のクラッシュ・未捕捉例外など、logging を経由しない出力） |
+| `logs/frontend.log` | frontend（Next.js）の標準出力・標準エラー |
+| `logs/summary.log` | サマリ生成バッチのログ |
+
+いずれも **JST 0時に日次ローテーション**し、終わった日のファイルは `*.log.YYYY-MM-DD` になる。保持日数は `config.yaml` の `logging.retention_days`（既定 7、1以上の整数。不正値は起動時エラー）で、超えた世代は自動で削除される。変更の反映にはアプリの再起動が必要。
+
+- `backend.log` は backend が logging で直接書く。`backend.stderr.log` / `frontend.log` は、本体の出力を `python -m deep_tracker.log_rotator --path <file>` へパイプして書き出す（`scripts/start.sh` も launchd の plist も同じ方式）。シェルの `>>` だと、ローテーション後も旧ファイルへ書き続けてしまうため使わない
+- 以前のバージョンが作ったサイズ基準の世代（`*.log.1` 等）は自動削除の対象外。不要なら手で消す。ローテーション方式の変更前から残る `backend.log` / `frontend.log` は、次の起動時に前日付の `*.log.YYYY-MM-DD` として切り出される
+- `scripts/dev-instance.sh`（動作確認用）は `.dev-run/` に出すだけで、ローテーションしない
 
 ```bash
 tail -f logs/fetch.log
@@ -184,4 +194,4 @@ scripts/summary-job.sh install
 - 通知内のリンクは `slack.base_url` があればそれを、なければ `LAN_IP` / `TAILSCALE_IP`（未指定なら `localhost`）と `frontend.port` から作る。launchd 経由のジョブには `LAN_IP` / `TAILSCALE_IP` が渡らないため、LAN公開時は `base_url` にアドレスを指定する
 - 多重起動は `<db.path の親>/summary.lock` で防ぐ
 
-ログは `logs/summary.log`（1MBで5世代ローテーション）。launchd が受け取った出力は `logs/summary.launchd.log`。
+ログは `logs/summary.log`（日次ローテーション。「6. ログ」参照）。launchd が受け取った出力は `logs/summary.launchd.log`。

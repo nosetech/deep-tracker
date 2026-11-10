@@ -22,9 +22,9 @@ from deep_tracker.db import Summary, create_db_engine, make_session_factory, upg
 from deep_tracker.jobs.ai_jobs import STATUS_SUCCEEDED
 from deep_tracker.jobs.fetch import (
     AlreadyRunningError,
-    configure_logging,
     single_instance,
 )
+from deep_tracker.logging_config import configure_logging
 from deep_tracker.notify.slack import SlackNotifier
 from deep_tracker.summary import generate_summary
 
@@ -145,7 +145,9 @@ def main(argv: list[str] | None = None) -> int:
         print(settings.instance)
         return 0
 
-    configure_logging(filename="summary.log")
+    configure_logging(
+        "summary.log", retention_days=settings.logging.retention_days, console=sys.stdout.isatty()
+    )
     try:
         with single_instance(lock_path_for(settings)):
             upgrade_db(settings)

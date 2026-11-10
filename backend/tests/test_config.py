@@ -158,6 +158,7 @@ def test_launch_settings_output(monkeypatch, tmp_path, capsys):
     assert capsys.readouterr().out.splitlines() == [
         "INSTANCE=default",
         f"LOG_DIR={loader.LOG_DIR}",
+        "LOG_RETENTION_DAYS=7",
         "FRONTEND_HOST=127.0.0.1",
         "FRONTEND_PUBLIC=",
         "FRONTEND_PORT=3710",

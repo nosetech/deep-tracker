@@ -65,7 +65,7 @@ scripts/start.sh   # backend と frontend をバックグラウンドで起動
 scripts/stop.sh    # 停止
 ```
 
-ブラウザで `http://127.0.0.1:3700`（`LAN_IP` / `TAILSCALE_IP` を指定した場合はそのIP、ポートは `frontend.port`）を開きます。ログは `logs/{backend,frontend}.log` です。
+ブラウザで `http://127.0.0.1:3700`（`LAN_IP` / `TAILSCALE_IP` を指定した場合はそのIP、ポートは `frontend.port`）を開きます。ログは `logs/{backend,backend.stderr,frontend}.log` です（JST 0時に日次ローテーションし、`config.yaml` の `logging.retention_days`（既定7日）を超えた世代は自動削除されます）。
 
 Mac の再起動やクラッシュで止まらないようにする場合は、launchd の LaunchAgent に登録します（ログイン時に起動し、落ちたら再起動します）。
 
@@ -89,7 +89,7 @@ scripts/fetch-job.sh install     # フィード取得（既定: 300秒ごとに�
 scripts/summary-job.sh install   # サマリ生成（既定: 3600秒ごとに起動し、期間が終わっていれば生成）
 ```
 
-操作は `status` / `start`（今すぐ1回）/ `stop` / `run`（ターミナルで1回実行）/ `uninstall`。ログは `logs/fetch.log` と `logs/summary.log` です。Slack通知を有効にしている場合、サマリの生成完了（失敗も）が通知されます。
+操作は `status` / `start`（今すぐ1回）/ `stop` / `run`（ターミナルで1回実行）/ `uninstall`。ログは `logs/fetch.log` と `logs/summary.log` です（同じく日次ローテーションします）。Slack通知を有効にしている場合、サマリの生成完了（失敗も）が通知されます。
 
 ## 5. 旧バージョンからの更新（マイグレーション）
 

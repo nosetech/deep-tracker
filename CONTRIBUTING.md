@@ -52,6 +52,7 @@ scripts/dev-instance.sh stop    # 停止
 
 - ポートは 18000 番台の空きから自動採番する（`DEV_BACKEND_PORT` / `DEV_FRONTEND_PORT` で指定も可。運用の既定ポート 8700/3700 や使用中のポートは拒否）。
 - 設定・DB・ログ・PID記録は `.dev-run/` に生成する（`config/config.yaml` と運用DBは使わない）。
+- ログは日次ローテーションせず `.dev-run/` に出すだけ（運用インスタンスのログローテーションは `docs/setup.md` の「ログ」）。
 - `DEEP_TRACKER_DEV_MODE=1` で起動するため、Slack通知とClaude Code CLI呼び出し（AIジョブ）は実行されない。RSS取得と一覧表示は動く。
 - `stop` は記録（PID・プロセスグループ・起動時の目印）と一致する場合だけ止める。不一致なら何もせずエラーにする。
 - 前提: `backend` で `uv sync`、`frontend` で `npm install` を済ませておく。

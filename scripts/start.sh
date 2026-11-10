@@ -6,6 +6,9 @@
 #           LAN_IP | TAILSCALE_IP  frontend を待ち受けさせるIP（どちらか一方。未指定なら 127.0.0.1）
 #                                 展開先ルートの .env にも書ける（シェルの環境変数が優先）
 #
+# 本体の出力は deep_tracker.log_rotator へパイプし、JST 0時に日次ローテーションする
+# （保持日数は config.yaml の logging.retention_days）。`>>` だとローテーション後も旧ファイルへ書き続けるため使わない。
+#
 # ポートは config.yaml の frontend.port / backend.port に従う。
 # 停止は scripts/stop.sh。
 set -euo pipefail
@@ -37,14 +40,23 @@ for svc in backend frontend; do
     fi
 done
 
+# 標準入力を日次ローテーション付きで $LOG_DIR/$1 へ書き出す（プロセス置換から呼ぶ）
+rotate_to() {
+    cd "$DEPLOY_ROOT/backend" && exec uv run python -m deep_tracker.log_rotator \
+        --path "$LOG_DIR/$1" --retention-days "$LOG_RETENTION_DAYS"
+}
+
 # /api/* の中継先は実行時に BACKEND_URL から読まれる（ビルドし直し不要）。backend は常に 127.0.0.1
 BACKEND_URL="${BACKEND_URL:-http://127.0.0.1:$BACKEND_PORT}"
 if [[ "$MODE" == start ]]; then
     ensure_frontend_build
 fi
 
-(cd "$DEPLOY_ROOT/backend" && nohup uv run python -m deep_tracker.main \
-    >>"$LOG_DIR/backend.log" 2>&1 & echo $! >"$(pid_file backend)")
+# backend.log は backend 自身が logging で書く。ここへ来るのは起動前のクラッシュ・未捕捉例外など
+# logging を経由しない出力で、同じパスを2プロセスが開くとローテーションが競合するため別ファイルにする。
+# PIDは本体のもの（プロセス置換の $!）。本体が止まるとパイプが閉じてローテータも終了する
+(cd "$DEPLOY_ROOT/backend" && PYTHONUNBUFFERED=1 nohup uv run python -m deep_tracker.main \
+    > >(rotate_to backend.stderr.log) 2>&1 & echo $! >"$(pid_file backend)")
 
 if [[ -n "$FRONTEND_PUBLIC" ]]; then
     echo "注意: $FRONTEND_HOST で待ち受けます（認証なし）。同じネットワーク/tailnet に接続できる全員が操作できます" >&2
@@ -63,13 +75,13 @@ if is_standalone; then
     # 配布版: Next.js の standalone 出力を node で直接起動する（利用者側の npm / ビルドは不要）
     (cd "$DEPLOY_ROOT/frontend" &&
         NODE_ENV=production HOSTNAME="$FRONTEND_HOST" PORT="$FRONTEND_PORT" BACKEND_URL="$BACKEND_URL" \
-            nohup node server.js >>"$LOG_DIR/frontend.log" 2>&1 & echo $! >"$(pid_file frontend)")
+            nohup node server.js > >(rotate_to frontend.log) 2>&1 & echo $! >"$(pid_file frontend)")
 else
     (cd "$DEPLOY_ROOT/frontend" &&
         FRONTEND_HOST="$FRONTEND_HOST" FRONTEND_PORT="$FRONTEND_PORT" BACKEND_URL="$BACKEND_URL" \
             ALLOWED_DEV_ORIGINS="${ALLOWED_DEV_ORIGINS:-$DEV_ORIGINS_DEFAULT}" \
-            nohup npm run "$MODE" >>"$LOG_DIR/frontend.log" 2>&1 & echo $! >"$(pid_file frontend)")
+            nohup npm run "$MODE" > >(rotate_to frontend.log) 2>&1 & echo $! >"$(pid_file frontend)")
 fi
 
 echo "起動しました: backend http://127.0.0.1:$BACKEND_PORT / frontend http://$FRONTEND_HOST:$FRONTEND_PORT"
-echo "ログ: $LOG_DIR/{backend,frontend}.log"
+echo "ログ: $LOG_DIR/{backend,backend.stderr,frontend}.log（日次ローテーション、${LOG_RETENTION_DAYS}日保持）"

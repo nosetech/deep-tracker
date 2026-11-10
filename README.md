@@ -48,7 +48,7 @@ scripts/start.sh   # backend と frontend をバックグラウンドで起動�
 scripts/stop.sh    # 両方を停止
 ```
 
-backend は `127.0.0.1:8700`、frontend は既定で `127.0.0.1`、ポートは `config.yaml` の `frontend.port` で待ち受ける。ログは `logs/` に出る。
+backend は `127.0.0.1:8700`、frontend は既定で `127.0.0.1`、ポートは `config.yaml` の `frontend.port` で待ち受ける。ログは `logs/` に出る。JST 0時に日次ローテーションし、`config.yaml` の `logging.retention_days`（既定7日）を超えた世代は自動削除される。
 
 ブラウザで <http://localhost:3700> を開く（`frontend.port` を変えた場合はそのポート）。
 
