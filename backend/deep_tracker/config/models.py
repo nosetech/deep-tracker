@@ -51,6 +51,18 @@ class LoggingSettings(_Section):
     retention_days: int = Field(DEFAULT_LOG_RETENTION_DAYS, ge=1)
 
 
+DEFAULT_BACKUP_DIR = "~/Backups/deep-tracker"
+DEFAULT_BACKUP_RETENTION_DAYS = 30
+
+
+class BackupSettings(_Section):
+    # DBバックアップの置き場所。instance ごとに <dir>/<instance>/ を切って書く。
+    # 相対パスは展開先ディレクトリ基準、`~` はホームに展開される
+    dir: str = Field(DEFAULT_BACKUP_DIR, min_length=1)
+    # この日数より古いバックアップを削除する
+    retention_days: int = Field(DEFAULT_BACKUP_RETENTION_DAYS, ge=1)
+
+
 class SummarySettings(_Section):
     interval: SummaryInterval = SummaryInterval.WEEKLY
 
@@ -96,6 +108,7 @@ class Settings(_Section):
     db: DbSettings = DbSettings()
     retention: RetentionSettings = RetentionSettings()
     logging: LoggingSettings = LoggingSettings()
+    backup: BackupSettings = BackupSettings()
     summary: SummarySettings = SummarySettings()
     slack: SlackSettings = SlackSettings()
     feed: FeedSettings = FeedSettings()

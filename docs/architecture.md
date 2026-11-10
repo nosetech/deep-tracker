@@ -82,18 +82,28 @@
 | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ポート          | バージョンごとに設定ファイルで指定する。`backend.port` と `frontend.port` を別々に持ち、既定は backend 8700 / frontend 3700。並行稼働する際は、バージョンごとに +10 ずつずらす（例: 8710 / 3710）        |
 | DBパス          | `db.path` で指定する。既定は展開先配下の `data/deep-tracker.db`。展開先ごとに別ファイルになるため衝突しない                                                                                              |
-| launchdジョブ名 | `com.nosetech.deep-tracker.<instance>.<job>` とする。`<instance>` は設定ファイルの `instance`（既定 `default`、並行稼働時はバージョン番号など）、`<job>` は `backend` / `frontend` / `fetch` / `summary` |
+| launchdジョブ名 | `com.nosetech.deep-tracker.<instance>.<job>` とする。`<instance>` は設定ファイルの `instance`（既定 `default`、並行稼働時はバージョン番号など）、`<job>` は `backend` / `frontend` / `fetch` / `summary` / `backup` |
 | plist・ログ     | 展開先配下の `logs/` に出力する。plist は展開時に `instance` を埋め込んで生成する                                                                                                                        |
 
 - 同じ DB ファイルを複数バージョンが同時に開かないこと。スキーマの異なるバージョンが同一DBを触るとマイグレーションが衝突するため、DBパスは必ずバージョンごとに分ける。
 - ポートが使用中の場合、起動時にエラーで終了する（自動で別ポートへ退避しない）。
 
+### DBバックアップ
+
+- `backend/deep_tracker/jobs/backup.py`（`python -m deep_tracker.jobs.backup`）を、launchd のジョブ `backup`（`scripts/backup-job.sh`）が毎日3:00（`StartCalendarInterval`）に実行する。
+- 方式は SQLite のオンラインバックアップAPI（標準ライブラリの `sqlite3.Connection.backup()`）。DBは WAL モードだが、このAPIは稼働中でも整合したスナップショットを作る。`cp` は `-wal` / `-shm` の取りこぼしや書き込みとの競合で不整合になりうるため使わない。外部の `sqlite3` コマンドにも依存しない。
+- 一時ファイル（`*.db.tmp`）に書き、`PRAGMA integrity_check` で検証してから rename する。失敗時は一時ファイルを消し、不完全なバックアップを残さない。バックアップは `journal_mode=DELETE` の単一ファイルにする。
+- 保存先は `<backup.dir>/<instance>/deep-tracker-<instance>-YYYYmmdd-HHMMSS.db`（JST）。`instance` ごとにディレクトリとファイル名を分けて、並行稼働するバージョン間の衝突を防ぐ。
+- 世代管理は `backup.retention_days`（既定30）を超えた mtime のファイルの削除で、対象は自分の `instance` のファイル名パターンのみ。
+- DBが無ければスキップして正常終了。失敗は `logs/backup.log` に記録し、`slack.notify_on_failure` が true ならSlack通知する。
+- リストアは手順書のみ（`dist/SETUP.md` / `docs/setup.md`）。スクリプトは持たない。
+
 ### ログのローテーション
 
-- `backend.log` / `frontend.log` / `fetch.log` / `summary.log` を、JST 0時に日次ローテーションする（`TimedRotatingFileHandler` のサブクラス `JstMidnightRotatingFileHandler`。0時の判定・世代ファイル名 `*.log.YYYY-MM-DD`・ログ内の時刻をOSのタイムゾーンに依存させずJSTに固定する。`backend/deep_tracker/logging_config.py`）。
+- `backend.log` / `frontend.log` / `fetch.log` / `summary.log` / `backup.log` を、JST 0時に日次ローテーションする（`TimedRotatingFileHandler` のサブクラス `JstMidnightRotatingFileHandler`。0時の判定・世代ファイル名 `*.log.YYYY-MM-DD`・ログ内の時刻をOSのタイムゾーンに依存させずJSTに固定する。`backend/deep_tracker/logging_config.py`）。
 - 保持日数は設定 `logging.retention_days`（既定7、1以上の整数）。超えた世代はハンドラが自動削除する。
 - logging を経由しない出力は、`python -m deep_tracker.log_rotator --path <file>`（標準入力を加工せず書き出すローテータ）へパイプして書き出す。対象は frontend（Next.js）の出力と、backend 本体の標準出力・標準エラー（起動前のクラッシュ・未捕捉例外。`backend.log` と同じパスを2プロセスが開くとローテーションが競合するため `backend.stderr.log` に分ける）。`scripts/start.sh` は `>>` リダイレクトではなくプロセス置換でパイプし、launchd の plist も `StandardOutPath` を使わず `bash -c` で同じパイプを組む。ローテータは書き込みエラー・設定読み込み失敗・不正なUTF-8でも落ちない（落ちると本体が SIGPIPE を受けるため）。
-- `*.launchd.log`（fetch / summary の起動直後のクラッシュ専用）は plist のまま。通常ログは logging 経由で、端末から手動実行したときだけ標準出力にも出す。
+- `*.launchd.log`（fetch / summary / backup の起動直後のクラッシュ専用）は plist のまま。通常ログは logging 経由で、端末から手動実行したときだけ標準出力にも出す。
 - 動作確認用インスタンス（`scripts/dev-instance.sh`）は `.dev-run/` に出すだけでローテーションしない。
 
 ## 4. 想定ディレクトリ構成

@@ -82,14 +82,34 @@ scripts/service.sh uninstall # 登録を解除
 
 ## 4. 定期実行ジョブの登録
 
-フィードの定期取得とサマリの定期生成は、launchd のジョブとして登録します。
+フィードの定期取得・サマリの定期生成・DBの日次バックアップは、launchd のジョブとして登録します。
 
 ```bash
 scripts/fetch-job.sh install     # フィード取得（既定: 300秒ごとに、取得間隔を過ぎたフィードのみ取得）
 scripts/summary-job.sh install   # サマリ生成（既定: 3600秒ごとに起動し、期間が終わっていれば生成）
+scripts/backup-job.sh install    # DBバックアップ（毎日3:00）
 ```
 
-操作は `status` / `start`（今すぐ1回）/ `stop` / `run`（ターミナルで1回実行）/ `uninstall`。ログは `logs/fetch.log` と `logs/summary.log` です（同じく日次ローテーションします）。Slack通知を有効にしている場合、サマリの生成完了（失敗も）が通知されます。
+操作は `status` / `start`（今すぐ1回）/ `stop` / `run`（ターミナルで1回実行）/ `uninstall`。ログは `logs/fetch.log` / `logs/summary.log` / `logs/backup.log` です（同じく日次ローテーションします）。Slack通知を有効にしている場合、サマリの生成完了（失敗も）が通知されます。
+
+### DBのバックアップとリストア
+
+記事・サマリ・既読状態・フィード購読・フィードバック履歴はすべて DB（`db.path`）にあり、失うと復元できません。`scripts/backup-job.sh install` で、毎日3:00にバックアップします（稼働中でも整合したコピーを作ります）。
+
+- 保存先は `config.yaml` の `backup.dir`（既定 `~/Backups/deep-tracker`）配下の `<instance>/` で、ファイル名は `deep-tracker-<instance>-YYYYmmdd-HHMMSS.db`（JST）です。`instance` ごとに分かれるため、並行稼働するバージョン間で衝突しません
+- `backup.retention_days`（既定30）より古いバックアップは自動で削除されます（このジョブのファイル名のものだけが対象です）
+- バックアップ後に整合性を検証し、失敗した場合はログに記録します。Slack通知を有効にしていて `slack.notify_on_failure` が true なら通知もされます
+- 今すぐ取るには `scripts/backup-job.sh start`（またはターミナルで `scripts/backup-job.sh run`）
+- 旧バージョンの `config.yaml` に `backup` が無くても、既定値で動作します
+
+リストア手順:
+
+```bash
+scripts/service.sh stop      # または scripts/stop.sh。アプリを停止する
+cp ~/Backups/deep-tracker/<instance>/deep-tracker-<instance>-<日時>.db <db.path>
+rm -f <db.path>-wal <db.path>-shm    # 残っていれば削除する
+scripts/service.sh start     # または scripts/start.sh
+```
 
 ## 5. 旧バージョンからの更新（マイグレーション）
 
@@ -111,7 +131,7 @@ cd deep-tracker-<新version>
 - 新バージョン側に同名のファイルがあるときは既定でスキップします。`--force` で `<file>.bak-<日時>` に退避して上書きします。何度実行しても安全です
 - 旧バージョンの展開先は変更・削除しません。動作確認が済むまで残しておけます
 - **並行稼働する場合**は、移行した `config/config.yaml` の `instance` / `backend.port` / `frontend.port` / `db.path` を新バージョン側で変更してください（自動では書き換えません）。変更しないと旧バージョンとポート・DB・launchd ジョブ名が衝突します
-- 移行後、新バージョンで `scripts/fetch-job.sh install` / `scripts/summary-job.sh install` / `scripts/service.sh install` を実行します。ジョブ名に `instance` が含まれるため、`instance` が旧バージョンと同じ場合は旧バージョンのジョブを上書きします。旧バージョンを止める場合は、旧展開先で `scripts/service.sh uninstall` / `scripts/fetch-job.sh uninstall` / `scripts/summary-job.sh uninstall` を実行します
+- 移行後、新バージョンで `scripts/fetch-job.sh install` / `scripts/summary-job.sh install` / `scripts/backup-job.sh install` / `scripts/service.sh install` を実行します。ジョブ名に `instance` が含まれるため、`instance` が旧バージョンと同じ場合は旧バージョンのジョブを上書きします。旧バージョンを止める場合は、旧展開先で `scripts/service.sh uninstall` / `scripts/fetch-job.sh uninstall` / `scripts/summary-job.sh uninstall` / `scripts/backup-job.sh uninstall` を実行します
 
 ## ディレクトリ構成
 

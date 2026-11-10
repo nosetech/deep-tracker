@@ -12,6 +12,9 @@ db:
   path: data/deep-tracker.db # 相対パスは展開先ディレクトリ基準
 logging:
   retention_days: 7 # ログの保持日数。JST 0時に日次ローテーションし、超えた世代は自動削除する
+backup:
+  dir: ~/Backups/deep-tracker # DBバックアップの置き場所。<dir>/<instance>/ に deep-tracker-<instance>-YYYYmmdd-HHMMSS.db（JST）で保存する。相対パスは展開先基準
+  retention_days: 30 # この日数より古いバックアップは自動削除する
 retention:
   days: 365 # 記事の保存期間（日）
 summary:
