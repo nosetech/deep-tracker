@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- DBバックアップ（python -m deep_tracker.jobs.backup）を launchd の per-user LaunchAgent
+     として定期実行するためのテンプレート。
+
+     通常は scripts/backup-job.sh install がこのファイルから plist を生成・登録する。
+     手動で使う場合は、__INSTANCE__ / __DEPLOY_ROOT__ を置換して
+     ~/Library/LaunchAgents/ に置き、launchctl load -w で読み込む。
+     手順は docs/setup.md を参照。
+
+     ジョブ名（Label）に instance（設定ファイルの instance）を含めるため、
+     instance の異なる展開先を別ジョブとして並行登録できる。 -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.nosetech.deep-tracker.__INSTANCE__.backup</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>__DEPLOY_ROOT__/backend/.venv/bin/python</string>
+        <string>-m</string>
+        <string>deep_tracker.jobs.backup</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>__DEPLOY_ROOT__/backend</string>
+    <!-- 毎日3:00に実行する。スリープ等で逃した場合は、復帰後に実行される。 -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>3</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+    <!-- 通常のログは logging が logs/backup.log に書き、ローテーションする。
+         以下は logging に乗らない出力（起動直後のクラッシュ等）専用の別ファイル。 -->
+    <key>StandardOutPath</key>
+    <string>__DEPLOY_ROOT__/logs/backup.launchd.log</string>
+    <key>StandardErrorPath</key>
+    <string>__DEPLOY_ROOT__/logs/backup.launchd.log</string>
+</dict>
+</plist>

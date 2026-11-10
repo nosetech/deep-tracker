@@ -81,6 +81,7 @@ def build_dev_config(run_dir: Path, worktree: str, backend_port: int, frontend_p
         "backend": {"port": backend_port},
         "frontend": {"port": frontend_port},
         "db": {"path": str(run_dir / "deep-tracker.db")},
+        "backup": {"dir": str(run_dir / "backups")},
         "slack": {"enabled": False},
     }
     Settings.model_validate(config)  # 生成物が設定として有効であることを保証する

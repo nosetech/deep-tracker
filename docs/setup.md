@@ -144,6 +144,7 @@ DBを分けていれば互いに干渉しない。
 | `logs/backend.stderr.log` | backend の標準出力・標準エラー（起動前のクラッシュ・未捕捉例外など、logging を経由しない出力） |
 | `logs/frontend.log` | frontend（Next.js）の標準出力・標準エラー |
 | `logs/summary.log` | サマリ生成バッチのログ |
+| `logs/backup.log` | DBバックアップのログ |
 
 いずれも **JST 0時に日次ローテーション**し、終わった日のファイルは `*.log.YYYY-MM-DD` になる。保持日数は `config.yaml` の `logging.retention_days`（既定 7、1以上の整数。不正値は起動時エラー）で、超えた世代は自動で削除される。変更の反映にはアプリの再起動が必要。
 
@@ -195,3 +196,49 @@ scripts/summary-job.sh install
 - 多重起動は `<db.path の親>/summary.lock` で防ぐ
 
 ログは `logs/summary.log`（日次ローテーション。「6. ログ」参照）。launchd が受け取った出力は `logs/summary.launchd.log`。
+
+# DBバックアップ
+
+DB（`db.path`）には記事・サマリ・既読状態・フィード購読・フィードバック履歴がすべて入っており、失うと復元できない。毎日3:00に自動バックアップする。
+
+## 1. 設定
+
+`config/config.yaml` の `backup` セクション（変更は再起動ではなく、次回のバックアップ実行から反映される）。
+
+```yaml
+backup:
+  dir: ~/Backups/deep-tracker # 保存先。相対パスは展開先基準
+  retention_days: 30 # 保持日数（1以上の整数。不正値はエラー）
+```
+
+- 保存先は `<backup.dir>/<instance>/`、ファイル名は `deep-tracker-<instance>-YYYYmmdd-HHMMSS.db`（JST）。`instance` ごとに分かれるため、並行稼働するバージョン間で衝突しない
+- `backup` セクションが無い設定ファイル（旧バージョンから移行したもの）でも、既定値で動作する
+
+## 2. 登録・操作
+
+```sh
+scripts/backup-job.sh install
+```
+
+- ジョブ名は `com.nosetech.deep-tracker.<instance>.backup`（instance ごとに別ジョブ）。毎日3:00に実行する
+- 操作（`uninstall` / `start` / `stop` / `status` / `run`）は `scripts/fetch-job.sh` と同じ。今すぐ取るなら `scripts/backup-job.sh start`（または `run`）
+
+## 3. 動作
+
+- SQLite のオンラインバックアップAPIでコピーするため、アプリの稼働中でも整合したバックアップが取れる
+- 一時ファイルに書いて `PRAGMA integrity_check` で検証してから確定する。失敗した場合は不完全なファイルを残さず、ログに記録し、`slack.notify_on_failure` が true ならSlack通知する
+- `backup.retention_days` を超えたバックアップを削除する（自分の `instance` のファイル名パターンのみ）
+- DBがまだ無い場合はスキップして正常終了する
+
+ログは `logs/backup.log`（日次ローテーション。「6. ログ」参照）。launchd が受け取った出力は `logs/backup.launchd.log`。
+
+## 4. リストア
+
+```sh
+scripts/service.sh stop      # または scripts/stop.sh。アプリを停止する
+cp ~/Backups/deep-tracker/<instance>/deep-tracker-<instance>-<日時>.db <db.path>
+rm -f <db.path>-wal <db.path>-shm    # 残っていれば削除する
+scripts/service.sh start     # または scripts/start.sh
+```
+
+リストア用のスクリプトは用意していない。起動時にスキーマは自動で引き上げられる。

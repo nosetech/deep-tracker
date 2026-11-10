@@ -192,10 +192,10 @@ cat <<EOF
 
 [migrate] 移行が完了しました。次の手順で新バージョンを起動してください。
   1. $NEW_ROOT/config/config.yaml を確認する（並行稼働なら instance / ポート / db.path を変える）
-  2. cd $NEW_ROOT && scripts/fetch-job.sh install && scripts/summary-job.sh install
+  2. cd $NEW_ROOT && scripts/fetch-job.sh install && scripts/summary-job.sh install && scripts/backup-job.sh install
   3. 常時起動する場合: scripts/service.sh install（手動なら scripts/start.sh）
   旧バージョンのジョブを止める場合は、旧展開先で次を実行する:
-     scripts/service.sh uninstall && scripts/fetch-job.sh uninstall && scripts/summary-job.sh uninstall
+     scripts/service.sh uninstall && scripts/fetch-job.sh uninstall && scripts/summary-job.sh uninstall && scripts/backup-job.sh uninstall
   注意: launchd ジョブ名に instance が含まれます。instance が旧バージョンと同じ場合、
         install すると旧バージョンのジョブを新しい展開先のもので上書きします。
 EOF
