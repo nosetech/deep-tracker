@@ -68,6 +68,15 @@
 - 折りたたみ状態は `localStorage`（キー `deep-tracker.sidebar`、`{"collapsed":true}`）に保存する。ちらつき防止のため、テーマと同様に hydration 前のインラインスクリプト（`lib/sidebar-state.ts` の `sidebarInitScript`）が `<html data-sidebar="collapsed">` を付け、見た目は CSS が属性で決める。保存値は型を検証し、壊れていれば展開に戻す。
 - 720px未満では `.pc-header` と `.sidebar` を非表示にし、`.mobile-header` / `.bottom-nav` を使う。
 
+### 2-7-1. ページの横幅
+
+- サマリ・記事一覧・購読フィード・記事詳細・読み込み中（スケルトン）は、固定の `max-width` を持たず、サイドバーを除いた領域の幅に合わせて広がる。
+- 超ワイド画面での間延びを避けるため、ページ全体の上限は1600px（左右padding 44pxずつを含むため、内容は `.main` の `--page-max: 1512px`）。上限を超えても中央寄せにせず、左寄せのまま。
+- サマリは左（サマリ本文、`flex: 1 1 560px`）を伸縮させ、右のサイド（一覧・元記事プレビュー）は現状の幅（1180px以上で280px）を維持する。
+- 記事本文（`.det-body`）の行長は `38em` のまま（左寄せ）。記事詳細のタイトル・メタ情報・操作ボタンは上限まで広がる。
+- 999px以下・719px以下の既存の切り替えは変えない。
+- 指示プロンプトは [design-prompt-ui-diff-fluid-width.md](./design-prompt-ui-diff-fluid-width.md)。
+
 ### 2-8. モバイルの画面高さ
 
 - `.app` の高さは `100dvh`（非対応ブラウザ向けに `100vh` をフォールバックとして先に記述）。アドレスバーの出入りに追従し、ヘッダー・フッターが常に画面内に収まる。
