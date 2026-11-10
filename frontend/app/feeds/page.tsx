@@ -6,6 +6,7 @@ import { useToast } from "@/components/Toast";
 import { ApiErrorPanel, LoadingSkeleton } from "@/components/states";
 import { ApiError, api } from "@/lib/api/client";
 import type { Feed } from "@/lib/api/types";
+import { describeFeedError } from "@/lib/feed-error";
 
 const INTERVAL_OPTIONS = [15, 30, 60, 180, 360, 720, 1440];
 
@@ -48,6 +49,7 @@ type Modal =
       url: string;
       interval: string;
       err: string;
+      errCode?: string;
     };
 
 export default function FeedsPage() {
@@ -56,6 +58,7 @@ export default function FeedsPage() {
   const [loadError, setLoadError] = useState(false);
   const [addUrl, setAddUrl] = useState("");
   const [addErr, setAddErr] = useState("");
+  const [addErrCode, setAddErrCode] = useState("");
   const [addBusy, setAddBusy] = useState(false);
   const [fetching, setFetching] = useState<Set<number>>(new Set());
   const [menu, setMenu] = useState<number | null>(null);
@@ -107,6 +110,7 @@ export default function FeedsPage() {
     }
     setAddBusy(true);
     setAddErr("");
+    setAddErrCode("");
     try {
       const feed = await api.createFeed(url);
       setAddUrl("");
@@ -120,11 +124,14 @@ export default function FeedsPage() {
       );
     } catch (err) {
       if (err instanceof ApiError && err.status === 422) {
+        const view = err.code === "invalid_url" ? null : describeFeedError(err);
         setAddErr(
           err.code === "invalid_url"
             ? "URLの形式が正しくありません。http:// または https:// から始まるURLを入力してください。"
-            : `RSS / Atom として解析できませんでした。${err.message}`,
+            : (view?.message ??
+                `RSS / Atom として解析できませんでした。${err.message}`),
         );
+        setAddErrCode(view?.code ?? "");
       } else if (err instanceof ApiError && err.code === "duplicate_url") {
         const dup = feeds?.find((f) => f.url === url);
         setAddErr(
@@ -228,16 +235,15 @@ export default function FeedsPage() {
       refreshShell();
     } catch (err) {
       if (modal.type === "edit" && err instanceof ApiError && err.code) {
+        const view = describeFeedError(err);
         const message =
           err.code === "invalid_url"
             ? "URLの形式が正しくありません。http:// または https:// から始まるURLを入力してください。"
             : err.code === "duplicate_url"
               ? "このフィードはすでに登録されています。"
-              : err.code === "not_a_feed"
-                ? `RSS / Atom として解析できませんでした。${err.message}`
-                : "";
+              : (view?.message ?? "");
         if (message) {
-          setModal({ ...modal, err: message });
+          setModal({ ...modal, err: message, errCode: view?.code });
           return;
         }
       }
@@ -293,7 +299,12 @@ export default function FeedsPage() {
               <circle cx="12" cy="12" r="9" />
               <path d="M12 7.5v5.5M12 16.5v.01" />
             </svg>
-            <span>{addErr}</span>
+            <div className="feed-add-err-body">
+              <span>{addErr}</span>
+              {addErrCode && (
+                <div className="feed-add-err-code">{addErrCode}</div>
+              )}
+            </div>
           </div>
         )}
         <div className="feed-add-hint">
@@ -533,13 +544,23 @@ export default function FeedsPage() {
                       borderColor: modal.err ? "var(--err)" : undefined,
                     }}
                     onChange={(e) =>
-                      setModal({ ...modal, url: e.target.value, err: "" })
+                      setModal({
+                        ...modal,
+                        url: e.target.value,
+                        err: "",
+                        errCode: undefined,
+                      })
                     }
                   />
                 </label>
                 {modal.err && (
                   <div role="alert" className="feed-add-err">
-                    <span>{modal.err}</span>
+                    <div className="feed-add-err-body">
+                      <span>{modal.err}</span>
+                      {modal.errCode && (
+                        <div className="feed-add-err-code">{modal.errCode}</div>
+                      )}
+                    </div>
                   </div>
                 )}
                 <label>

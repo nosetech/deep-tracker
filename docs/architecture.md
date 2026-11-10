@@ -74,6 +74,22 @@
 - `html` / `body` は `overflow: hidden` とし、ページ自体はスクロールさせない。スクロールは `.main` のみ。
 - `viewportFit: "cover"` を指定し、ヘッダー・フッターは `env(safe-area-inset-top/bottom)` 分を足してノッチ・ホームバーと重ならないようにする。
 
+### 2-9. フィード登録時のエラー
+
+`POST /api/feeds` と `PATCH /api/feeds/{id}`（URL変更）は、失敗時に `detail.code` で原因を区別する。
+
+| ステータス | code | 意味 |
+| --- | --- | --- |
+| 422 | `invalid_url` | URLの形式が不正（http / https 以外など） |
+| 409 | `duplicate_url` | 登録済みのURL |
+| 422 | `fetch_failed` | 取得に失敗（接続失敗・タイムアウト・HTTPエラー）。`detail.reason`（`http_status` / `timeout` / `connect`）と、HTTPエラーのときは `detail.http_status` を含む |
+| 422 | `not_a_feed` | 取得できたが RSS / Atom / JSON Feed として解析できない |
+
+- 画面は code ごとに文言を出し分ける。`not_a_feed` は「RSS / Atom として解析できませんでした。」、`fetch_failed` は「フィードを取得できませんでした。」を前置する。解析エラーの前置きを取得エラーに付けない。
+- `fetch_failed` には本文の下に `fetch_failed · 429` 形式のコード行を等幅で出し、ステータス別の補足を付ける（429・403: 配信元がアクセスを制限している可能性があり別のフィード URL を試す／404: URL を確認する／5xx: 時間をおいて再試行／タイムアウト・接続失敗: URL とネットワークを確認する）。文言は `frontend/lib/feed-error.ts`。
+- 429・403 は配信元のボット対策であることが多い。User-Agent の偽装などでの回避は行わず、別のURLを案内するだけにする。
+- 登録後の定期取得の失敗（`feeds.last_fetch_error`）は、従来どおり `describe_error()` の文字列を保存して表示する（画面側の補足は付けない）。
+
 ## 3. 複数バージョン並行稼働
 
 バージョン（例: `0.1.0` と `0.2.0`）ごとに展開先ディレクトリを分け、設定ファイルも各展開先に同梱する。バージョン間で衝突する資源は、すべて設定ファイルの値から導出する。
