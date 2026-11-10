@@ -25,9 +25,10 @@ router = APIRouter(prefix="/feeds", tags=["feeds"])
 SessionDep = Annotated[Session, Depends(get_session)]
 ClientDep = Annotated[httpx.Client | None, Depends(get_http_client)]
 
-# フィード追加時のエラー種別（GUIが3種類のエラー表示を出し分ける）
+# フィード追加時のエラー種別（GUIがエラー表示を出し分ける）
 ERROR_INVALID_URL = "invalid_url"
 ERROR_DUPLICATE_URL = "duplicate_url"
+ERROR_FETCH_FAILED = "fetch_failed"
 ERROR_NOT_A_FEED = "not_a_feed"
 ERROR_NOT_FOUND = "feed_not_found"
 
@@ -70,8 +71,26 @@ class FetchOut(BaseModel):
     feed: FeedOut
 
 
-def _error(status: int, code: str, message: str) -> HTTPException:
-    return HTTPException(status_code=status, detail={"code": code, "message": message})
+def _error(status: int, code: str, message: str, **extra: object) -> HTTPException:
+    return HTTPException(status_code=status, detail={"code": code, "message": message, **extra})
+
+
+def _fetch_failed(exc: httpx.HTTPError) -> HTTPException:
+    """取得の失敗（接続失敗・タイムアウト・HTTPエラー）を fetch_failed にする。
+
+    reason は http_status / timeout / connect / other のいずれか。HTTPエラーのときは http_status に
+    ステータスコードを入れる（画面が429などに応じた案内を出し分けるため）。
+    """
+    if isinstance(exc, httpx.HTTPStatusError):
+        reason, status = "http_status", exc.response.status_code
+    elif isinstance(exc, httpx.TimeoutException):
+        reason, status = "timeout", None
+    elif isinstance(exc, httpx.ConnectError):
+        reason, status = "connect", None
+    else:
+        # リダイレクトの繰り返し・応答の途中切断など
+        reason, status = "other", None
+    return _error(422, ERROR_FETCH_FAILED, describe_error(exc), reason=reason, http_status=status)
 
 
 def _validate_url(url: str) -> str:
@@ -151,7 +170,9 @@ def create_feed(body: FeedCreate, session: SessionDep, client: ClientDep) -> Fee
         # 重複チェックと登録の間に同じURLが登録された場合
         session.rollback()
         raise _error(409, ERROR_DUPLICATE_URL, "このフィードは既に登録されています") from None
-    except (httpx.HTTPError, FeedParseError) as exc:
+    except httpx.HTTPError as exc:
+        raise _fetch_failed(exc) from exc
+    except FeedParseError as exc:
         raise _error(422, ERROR_NOT_A_FEED, describe_error(exc)) from exc
     return _feed_out(session, feed)
 
@@ -172,7 +193,10 @@ def update_feed(feed_id: int, body: FeedUpdate, session: SessionDep, client: Cli
         except IntegrityError:
             session.rollback()
             raise _error(409, ERROR_DUPLICATE_URL, "このフィードは既に登録されています") from None
-        except (httpx.HTTPError, FeedParseError) as exc:
+        except httpx.HTTPError as exc:
+            session.rollback()
+            raise _fetch_failed(exc) from exc
+        except FeedParseError as exc:
             session.rollback()
             raise _error(422, ERROR_NOT_A_FEED, describe_error(exc)) from exc
     if "name" in sent:

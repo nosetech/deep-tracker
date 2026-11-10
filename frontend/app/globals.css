@@ -700,6 +700,19 @@ html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .nav-dot {
   text-wrap: pretty;
 }
 
+.feed-add-err-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.feed-add-err-code {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--tx2);
+}
+
 .feed-add-hint {
   font-size: 12px;
   color: var(--tx3);
