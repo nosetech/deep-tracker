@@ -199,7 +199,7 @@ scripts/summary-job.sh install
 
 # DBバックアップ
 
-DB（`db.path`）には記事・サマリ・既読状態・フィード購読・フィードバック履歴がすべて入っており、失うと復元できない。毎日3:00に自動バックアップする。
+DB（`db.path`）には記事・サマリ・既読状態・フィード購読・フィードバック履歴がすべて入っており、失うと復元できない。毎日3:00（既定。`install HH:MM` で変更可）に自動バックアップする。
 
 ## 1. 設定
 
@@ -220,7 +220,7 @@ backup:
 scripts/backup-job.sh install
 ```
 
-- ジョブ名は `com.nosetech.deep-tracker.<instance>.backup`（instance ごとに別ジョブ）。毎日3:00に実行する
+- ジョブ名は `com.nosetech.deep-tracker.<instance>.backup`（instance ごとに別ジョブ）。既定は毎日3:00に実行する（`install HH:MM` で変更可）
 - 操作（`uninstall` / `start` / `stop` / `status` / `run`）は `scripts/fetch-job.sh` と同じ。今すぐ取るなら `scripts/backup-job.sh start`（または `run`）
 
 ## 3. 動作

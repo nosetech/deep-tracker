@@ -115,7 +115,7 @@
 
 ### DBバックアップ
 
-- `backend/deep_tracker/jobs/backup.py`（`python -m deep_tracker.jobs.backup`）を、launchd のジョブ `backup`（`scripts/backup-job.sh`）が毎日3:00（`StartCalendarInterval`）に実行する。
+- `backend/deep_tracker/jobs/backup.py`（`python -m deep_tracker.jobs.backup`）を、launchd のジョブ `backup`（`scripts/backup-job.sh`）が毎日（既定3:00。`install HH:MM` で変更可）（`StartCalendarInterval`）に実行する。
 - 方式は SQLite のオンラインバックアップAPI（標準ライブラリの `sqlite3.Connection.backup()`）。DBは WAL モードだが、このAPIは稼働中でも整合したスナップショットを作る。`cp` は `-wal` / `-shm` の取りこぼしや書き込みとの競合で不整合になりうるため使わない。外部の `sqlite3` コマンドにも依存しない。
 - 一時ファイル（`*.db.tmp`）に書き、`PRAGMA integrity_check` で検証してから rename する。失敗時は一時ファイルを消し、不完全なバックアップを残さない。バックアップは `journal_mode=DELETE` の単一ファイルにする。
 - 保存先は `<backup.dir>/<instance>/deep-tracker-<instance>-YYYYmmdd-HHMMSS.db`（JST）。`instance` ごとにディレクトリとファイル名を分けて、並行稼働するバージョン間の衝突を防ぐ。

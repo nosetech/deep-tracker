@@ -87,14 +87,14 @@ scripts/service.sh uninstall # 登録を解除
 ```bash
 scripts/fetch-job.sh install     # フィード取得（既定: 300秒ごとに、取得間隔を過ぎたフィードのみ取得）
 scripts/summary-job.sh install   # サマリ生成（既定: 3600秒ごとに起動し、期間が終わっていれば生成）
-scripts/backup-job.sh install    # DBバックアップ（毎日3:00）
+scripts/backup-job.sh install    # DBバックアップ（既定 毎日3:00。時刻指定は install 04:30 のように渡す）
 ```
 
 操作は `status` / `start`（今すぐ1回）/ `stop` / `run`（ターミナルで1回実行）/ `uninstall`。ログは `logs/fetch.log` / `logs/summary.log` / `logs/backup.log` です（同じく日次ローテーションします）。Slack通知を有効にしている場合、サマリの生成完了（失敗も）が通知されます。
 
 ### DBのバックアップとリストア
 
-記事・サマリ・既読状態・フィード購読・フィードバック履歴はすべて DB（`db.path`）にあり、失うと復元できません。`scripts/backup-job.sh install` で、毎日3:00にバックアップします（稼働中でも整合したコピーを作ります）。
+記事・サマリ・既読状態・フィード購読・フィードバック履歴はすべて DB（`db.path`）にあり、失うと復元できません。`scripts/backup-job.sh install` で、既定で毎日3:00にバックアップします（`scripts/backup-job.sh install 04:30` のように時刻を指定でき、再実行で更新できます）（稼働中でも整合したコピーを作ります）。
 
 - 保存先は `config.yaml` の `backup.dir`（既定 `~/Backups/deep-tracker`）配下の `<instance>/` で、ファイル名は `deep-tracker-<instance>-YYYYmmdd-HHMMSS.db`（JST）です。`instance` ごとに分かれるため、並行稼働するバージョン間で衝突しません
 - `backup.retention_days`（既定30）より古いバックアップは自動で削除されます（このジョブのファイル名のものだけが対象です）

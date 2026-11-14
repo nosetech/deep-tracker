@@ -3,7 +3,7 @@
      として定期実行するためのテンプレート。
 
      通常は scripts/backup-job.sh install がこのファイルから plist を生成・登録する。
-     手動で使う場合は、__INSTANCE__ / __DEPLOY_ROOT__ を置換して
+     手動で使う場合は、__INSTANCE__ / __DEPLOY_ROOT__ / __HOUR__ / __MINUTE__ を置換して
      ~/Library/LaunchAgents/ に置き、launchctl load -w で読み込む。
      手順は docs/setup.md を参照。
 
@@ -22,13 +22,13 @@
     </array>
     <key>WorkingDirectory</key>
     <string>__DEPLOY_ROOT__/backend</string>
-    <!-- 毎日3:00に実行する。スリープ等で逃した場合は、復帰後に実行される。 -->
+    <!-- 毎日 __HOUR__:__MINUTE__ に実行する（backup-job.sh install で指定。既定 3:00）。スリープ等で逃した場合は、復帰後に実行される。 -->
     <key>StartCalendarInterval</key>
     <dict>
         <key>Hour</key>
-        <integer>3</integer>
+        <integer>__HOUR__</integer>
         <key>Minute</key>
-        <integer>0</integer>
+        <integer>__MINUTE__</integer>
     </dict>
     <!-- 通常のログは logging が logs/backup.log に書き、ローテーションする。
          以下は logging に乗らない出力（起動直後のクラッシュ等）専用の別ファイル。 -->
