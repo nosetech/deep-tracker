@@ -81,7 +81,7 @@ scripts/service.sh uninstall  # 解除
 ```sh
 scripts/fetch-job.sh install     # フィードの定期取得
 scripts/summary-job.sh install   # サマリの定期生成
-scripts/backup-job.sh install    # DBの日次バックアップ（毎日3:00）
+scripts/backup-job.sh install    # DBの日次バックアップ（既定は毎日3:00。`install HH:MM` で時刻を指定可）
 ```
 
 登録・操作・ログの詳細は [docs/setup.md](docs/setup.md) を参照。
