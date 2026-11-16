@@ -30,7 +30,7 @@ RSSリーダー + AIによる要約システム。元ネタは Inkdrop のノー
 | 設定               | **GUIからは変更しない。YAML設定ファイルの編集のみ**。反映はアプリの再起動                                                                                                                                                                             |
 | 設定ファイルの場所 | アプリケーションの展開先に同梱する（producer-desk と同様）。複数バージョンを並行して動かせるようにする                                                                                                                                                |
 | Slack              | Webhook URLを設定ファイルから読み込む                                                                                                                                                                                                                 |
-| GUIデザイン        | Claude Design を正とする（[CLAUDE.md](../CLAUDE.md) 参照）                                                                                                                                                                                            |
+| GUIデザイン        | Claude の Artifacts のデザインを正とする（[CLAUDE.md](../CLAUDE.md) 参照）                                                                                                                                                                                            |
 | テスト             | RSSとして `https://aws.amazon.com/jp/about-aws/whats-new/recent/feed/` を最低限使う                                                                                                                                                                   |
 
 ### 設定ファイルで持つ項目（想定）

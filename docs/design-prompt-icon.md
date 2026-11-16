@@ -1,6 +1,6 @@
 # アイコン（ロゴ）のデザイン指示
 
-Claude Design（`Deep Tracker Icons.dc.html`）で作成した。issue #70。
+Claude（`Deep Tracker Icons.dc.html`）で作成した。issue #70。
 
 ## 指示の要旨
 
