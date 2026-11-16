@@ -1,6 +1,6 @@
 # デザイン変更プロンプト: サマリ画面の定期実行表示（#78）
 
-Claude Design の「Deep Tracker.dc.html」に対する変更指示。反映済み（DesignSync で実ソースを確認済み）。
+Claude の「Deep Tracker.dc.html」に対する変更指示。反映済み（Artifact ツールで実ソースを確認済み）。
 
 ```
 サマリ画面（デスクトップのサイドバー下部）の定期実行の注記を、次の2行に変更してください。

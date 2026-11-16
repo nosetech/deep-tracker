@@ -1,6 +1,6 @@
-# Claude Designへの指示プロンプト: Deep Tracker 画面設計
+# Claudeチャットへの指示プロンプト: Deep Tracker 画面設計
 
-`deep-tracker`（RSSリーダー + AIによる要約）の画面デザインを Claude Design に依頼したプロンプトです。実際に送信した内容を、読みやすいよう改行して記録しています（送信時は入力欄の都合で1行にまとめた）。
+`deep-tracker`（RSSリーダー + AIによる要約）の画面デザインを Claude に依頼したプロンプトです。実際に送信した内容を、読みやすいよう改行して記録しています（送信時は入力欄の都合で1行にまとめた）。
 
 - 作成されたデザイン: <https://claude.ai/design/p/122eb4f8-8479-49f5-8e1d-2a1d9d5ed71e?file=Deep+Tracker.dc.html>
 - このプロンプト送信後に、設定画面の削除とテーマ切り替えボタンの追加を依頼している（[design-prompt-ui-diff-remove-settings.md](./design-prompt-ui-diff-remove-settings.md)）。**最新のデザインは両方を反映したもの**。
