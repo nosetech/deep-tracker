@@ -170,3 +170,75 @@ def test_feed_mark_read(client, data):
     assert client.post("/api/feeds/99999/mark-read").status_code == 404
     again = client.post(f"/api/feeds/{data['fa']}/mark-read").json()
     assert again == {"count": 0, "article_ids": []}
+
+
+def test_set_mark_and_unmark(client, data):
+    url = f"/api/articles/{data['a0']}/mark"
+    res = client.patch(url, json={"is_marked": True}).json()
+    assert res["is_marked"] and res["marked_at"]
+    first = res["marked_at"]
+    # 同じ値の再送では marked_at が変わらない
+    assert client.patch(url, json={"is_marked": True}).json()["marked_at"] == first
+    res = client.patch(url, json={"is_marked": False}).json()
+    assert not res["is_marked"] and res["marked_at"] is None
+    assert client.patch("/api/articles/99999/mark", json={"is_marked": True}).status_code == 404
+
+
+def test_mark_is_independent_of_read(client, data):
+    mark = f"/api/articles/{data['a0']}/mark"
+    read = f"/api/articles/{data['a0']}/read"
+    # マークしても未読のまま
+    client.patch(mark, json={"is_marked": True})
+    detail = client.get(f"/api/articles/{data['a0']}").json()
+    assert detail["is_marked"] and not detail["is_read"] and detail["marked_at"]
+    # 既読にしてもマークは外れない
+    client.patch(read, json={"is_read": True})
+    detail = client.get(f"/api/articles/{data['a0']}").json()
+    assert detail["is_marked"] and detail["is_read"]
+    # 既読を戻してもマークは保持
+    client.patch(read, json={"is_read": False})
+    assert client.get(f"/api/articles/{data['a0']}").json()["is_marked"]
+    # 一括既読でもマークは変わらない
+    client.post("/api/articles/mark-read")
+    assert client.get(f"/api/articles/{data['a0']}").json()["is_marked"]
+
+
+def test_list_marked_only(client, data):
+    def titles(**params):
+        return [i["title"] for i in client.get("/api/articles", params=params).json()["items"]]
+
+    assert titles(marked_only=True) == []
+    for key in ("a1", "b0", "a3"):
+        client.patch(f"/api/articles/{data[key]}/mark", json={"is_marked": True})
+    assert titles(marked_only=True) == ["Alpha 3", "Alpha 1", "Beta 0"]
+    items = client.get("/api/articles", params={"marked_only": True}).json()["items"]
+    assert all(i["is_marked"] for i in items)
+    # 他の条件と併用できる
+    assert titles(marked_only=True, feed_id=data["fb"]) == ["Beta 0"]
+    assert titles(marked_only=True, q="sure") == ["Alpha 1"]
+    assert titles(marked_only=True, since="2026-10-03T00:00:00Z") == ["Alpha 3"]
+    client.patch(f"/api/articles/{data['a3']}/read", json={"is_read": True})
+    assert titles(marked_only=True, unread_only=True) == ["Alpha 1", "Beta 0"]
+    # 件数は total で取れる
+    res = client.get("/api/articles", params={"marked_only": True, "per_page": 1}).json()
+    assert res["total"] == 3
+    # マーク外しで一覧から消える
+    client.patch(f"/api/articles/{data['b0']}/mark", json={"is_marked": False})
+    assert titles(marked_only=True) == ["Alpha 3", "Alpha 1"]
+    # 一覧の既定ではマークの有無に関わらず全件
+    assert len(titles()) == 7
+
+
+def test_detail_neighbors_marked_only(client, data):
+    for key in ("a1", "a3", "b1"):
+        client.patch(f"/api/articles/{data[key]}/mark", json={"is_marked": True})
+    # 現在の記事(a2)がマーク外でも、その位置から見たマーク済みの前後を返す
+    res = client.get(f"/api/articles/{data['a2']}", params={"marked_only": True}).json()
+    assert res["newer"]["id"] == data["a3"]
+    assert res["older"]["id"] == data["b1"]
+    res = client.get(f"/api/articles/{data['a3']}", params={"marked_only": True}).json()
+    assert res["newer"] is None
+    res = client.get(f"/api/articles/{data['a1']}", params={"marked_only": True}).json()
+    assert res["older"] is None
+    # 指定なしなら従来どおりマーク外も含む
+    assert client.get(f"/api/articles/{data['a2']}").json()["newer"]["title"] == "Alpha 3"

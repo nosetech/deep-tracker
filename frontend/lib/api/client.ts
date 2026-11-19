@@ -7,6 +7,7 @@ import type {
   Feed,
   FetchResult,
   GenerationState,
+  MarkState,
   ReadState,
   SummaryConfig,
   SummaryDetail,
@@ -92,14 +93,25 @@ export const api = {
     }
     return request<ArticleList>(`/articles?${params}`);
   },
-  getArticle: (id: number, opts: { unreadOnly?: boolean } = {}) =>
-    request<ArticleDetail>(
-      `/articles/${id}${opts.unreadOnly ? "?unread_only=true" : ""}`,
-    ),
+  getArticle: (
+    id: number,
+    opts: { unreadOnly?: boolean; markedOnly?: boolean } = {},
+  ) => {
+    const params = new URLSearchParams();
+    if (opts.unreadOnly) params.set("unread_only", "true");
+    if (opts.markedOnly) params.set("marked_only", "true");
+    const qs = params.toString();
+    return request<ArticleDetail>(`/articles/${id}${qs ? `?${qs}` : ""}`);
+  },
   setArticleRead: (id: number, isRead: boolean) =>
     request<ReadState>(`/articles/${id}/read`, {
       method: "PATCH",
       body: JSON.stringify({ is_read: isRead }),
+    }),
+  setArticleMarked: (id: number, isMarked: boolean) =>
+    request<MarkState>(`/articles/${id}/mark`, {
+      method: "PATCH",
+      body: JSON.stringify({ is_marked: isMarked }),
     }),
   getUnreadCounts: () => request<UnreadCounts>("/articles/unread-counts"),
   listSummaries: () => request<SummaryListItem[]>("/summaries"),

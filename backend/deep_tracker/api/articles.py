@@ -31,6 +31,7 @@ class ArticleFilter:
     def __init__(
         self,
         unread_only: bool = False,
+        marked_only: bool = False,
         feed_id: int | None = None,
         since: datetime | None = Query(None, description="この日時以降（含む）"),
         until: datetime | None = Query(None, description="この日時より前"),
@@ -39,6 +40,7 @@ class ArticleFilter:
         ),
     ) -> None:
         self.unread_only = unread_only
+        self.marked_only = marked_only
         self.feed_id = feed_id
         self.since = _as_utc(since)
         self.until = _as_utc(until)
@@ -48,6 +50,8 @@ class ArticleFilter:
         conds: list[ColumnElement[bool]] = []
         if self.unread_only:
             conds.append(Article.is_read.is_(False))
+        if self.marked_only:
+            conds.append(Article.is_marked.is_(True))
         if self.feed_id is not None:
             conds.append(Article.feed_id == self.feed_id)
         if self.since is not None:
@@ -79,6 +83,7 @@ class ArticleListItem(BaseModel):
     excerpt: str | None
     published_at: datetime | None
     is_read: bool
+    is_marked: bool
 
 
 class ArticleList(BaseModel):
@@ -104,6 +109,8 @@ class ArticleDetail(BaseModel):
     fetched_at: datetime
     is_read: bool
     read_at: datetime | None
+    is_marked: bool
+    marked_at: datetime | None
     newer: ArticleNeighbor | None
     older: ArticleNeighbor | None
 
@@ -126,6 +133,16 @@ class ReadState(BaseModel):
     id: int
     is_read: bool
     read_at: datetime | None
+
+
+class MarkUpdate(BaseModel):
+    is_marked: bool
+
+
+class MarkState(BaseModel):
+    id: int
+    is_marked: bool
+    marked_at: datetime | None
 
 
 class BulkReadResult(BaseModel):
@@ -180,6 +197,7 @@ def list_articles(
             excerpt=_excerpt(a.content),
             published_at=a.published_at,
             is_read=a.is_read,
+            is_marked=a.is_marked,
         )
         for a, feed_name in rows
     ]
@@ -230,6 +248,8 @@ def get_article(article_id: int, session: SessionDep, flt: FilterDep) -> Article
         fetched_at=article.fetched_at,
         is_read=article.is_read,
         read_at=article.read_at,
+        is_marked=article.is_marked,
+        marked_at=article.marked_at,
         newer=neighbor(newer=True),
         older=neighbor(newer=False),
     )
@@ -243,6 +263,16 @@ def set_read(article_id: int, body: ReadUpdate, session: SessionDep) -> ReadStat
         article.read_at = utcnow() if body.is_read else None
         session.commit()
     return ReadState(id=article.id, is_read=article.is_read, read_at=article.read_at)
+
+
+@router.patch("/articles/{article_id}/mark", response_model=MarkState)
+def set_mark(article_id: int, body: MarkUpdate, session: SessionDep) -> MarkState:
+    article = _get_article(session, article_id)
+    if article.is_marked != body.is_marked:
+        article.is_marked = body.is_marked
+        article.marked_at = utcnow() if body.is_marked else None
+        session.commit()
+    return MarkState(id=article.id, is_marked=article.is_marked, marked_at=article.marked_at)
 
 
 def _mark_read(session: Session, conds: list[ColumnElement[bool]]) -> BulkReadResult:

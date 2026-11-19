@@ -94,6 +94,7 @@ class Article(Base):
         Index("ix_articles_published_at", "published_at"),
         Index("ix_articles_feed_id_published_at", "feed_id", "published_at"),
         Index("ix_articles_is_read_published_at", "is_read", "published_at"),
+        Index("ix_articles_is_marked_published_at", "is_marked", "published_at"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -108,6 +109,9 @@ class Article(Base):
     fetched_at: Mapped[datetime] = mapped_column(default=utcnow)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     read_at: Mapped[datetime | None]
+    # マーク（ブックマーク）。既読/未読とは独立。マーク済みは保存期間による削除の対象外
+    is_marked: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    marked_at: Mapped[datetime | None]
 
     feed: Mapped[Feed] = relationship(back_populates="articles")
 

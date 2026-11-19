@@ -49,6 +49,7 @@ def test_indexes(engine):
         "ix_articles_published_at",
         "ix_articles_feed_id_published_at",
         "ix_articles_is_read_published_at",
+        "ix_articles_is_marked_published_at",
     } <= idx
 
 
@@ -95,6 +96,7 @@ def test_defaults_and_utc_roundtrip(engine):
         s.expire_all()
         got = s.get(Article, art.id)
         assert got.is_read is False and got.read_at is None
+        assert got.is_marked is False and got.marked_at is None
         assert got.published_at == datetime(2026, 1, 2, 3, 4, tzinfo=UTC)
         assert s.get(Feed, feed.id).enabled is True
         with pytest.raises(StatementError):
@@ -130,3 +132,48 @@ def test_make_guid_fallback():
     by_title = make_guid(None, None, "t", t)
     assert by_title.startswith("title:")
     assert by_title != make_guid(None, None, "t", None)
+
+
+def test_mark_migration_upgrade_and_downgrade(tmp_path):
+    """0002 の既存記事が 0003 で is_marked=0 になり、downgrade で戻せること。"""
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import text
+
+    from deep_tracker.db.session import BACKEND_ROOT
+
+    db_path = tmp_path / "mig.db"
+    cfg = Config(str(BACKEND_ROOT / "alembic.ini"))
+    cfg.set_main_option("script_location", str(BACKEND_ROOT / "migrations"))
+    cfg.attributes["db_path"] = db_path
+    command.upgrade(cfg, "0002")
+    eng = create_db_engine(db_path)
+    try:
+        with eng.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO feeds (id, name, url, enabled, created_at)"
+                    " VALUES (1, 'f', 'https://e.example/rss', 1, '2026-01-01')"
+                )
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO articles (feed_id, guid, title, fetched_at, is_read)"
+                    " VALUES (1, 'g', 't', '2026-01-01', 0)"
+                )
+            )
+        command.upgrade(cfg, "0003")
+        with eng.connect() as conn:
+            assert conn.execute(text("SELECT is_marked, marked_at FROM articles")).one() == (
+                0,
+                None,
+            )
+        idx = {i["name"] for i in inspect(eng).get_indexes("articles")}
+        assert "ix_articles_is_marked_published_at" in idx
+        command.downgrade(cfg, "0002")
+        cols = {c["name"] for c in inspect(eng).get_columns("articles")}
+        assert not {"is_marked", "marked_at"} & cols
+        with eng.connect() as conn:
+            assert conn.execute(text("SELECT count(*) FROM articles")).scalar() == 1
+    finally:
+        eng.dispose()

@@ -1238,6 +1238,31 @@ html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .nav-dot {
   flex: 1 1 120px;
 }
 
+.art-marked-filter {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line2);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--tx);
+  font-size: 13px;
+  font-weight: 400;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  flex: 1 1 auto;
+}
+
+.art-marked-filter.is-on {
+  border-color: var(--acLine);
+  background: var(--acSoft);
+  color: var(--ac);
+  font-weight: 600;
+}
+
 .art-spacer {
   flex: 10 1 0;
 }
@@ -1445,6 +1470,30 @@ html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .nav-dot {
   color: var(--tx);
 }
 
+.art-mark {
+  flex: none;
+  margin-top: 10px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--tx3);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.art-mark:hover {
+  background: var(--hover);
+  color: var(--ac);
+}
+
+.art-mark.is-on {
+  color: var(--ac);
+}
+
 .art-toggle-m {
   display: none;
 }
@@ -1482,8 +1531,29 @@ html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .nav-dot {
   }
 
   .art-select,
-  .art-readall {
+  .art-readall,
+  .art-marked-filter {
     height: 40px;
+  }
+
+  .art-mark {
+    width: 40px;
+    height: 44px;
+    margin-top: 4px;
+  }
+
+  .art-mark:hover {
+    background: none;
+    color: var(--tx3);
+  }
+
+  .art-mark.is-on:hover {
+    color: var(--ac);
+  }
+
+  .art-mark svg {
+    width: 19px;
+    height: 19px;
   }
 
   .art-title {
@@ -1588,6 +1658,25 @@ html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .nav-dot {
   border: 1px solid var(--line2);
   background: transparent;
   cursor: pointer;
+}
+
+.det-mark {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 7px;
+  border: 1px solid var(--line2);
+  background: transparent;
+  color: var(--tx2);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.det-mark.is-on {
+  border-color: var(--acLine);
+  background: var(--acSoft);
+  color: var(--ac);
 }
 
 .det-dot {
