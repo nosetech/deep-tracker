@@ -49,6 +49,7 @@ def test_indexes(engine):
         "ix_articles_published_at",
         "ix_articles_feed_id_published_at",
         "ix_articles_is_read_published_at",
+        "ix_articles_is_marked_published_at",
     } <= idx
 
 
@@ -95,6 +96,7 @@ def test_defaults_and_utc_roundtrip(engine):
         s.expire_all()
         got = s.get(Article, art.id)
         assert got.is_read is False and got.read_at is None
+        assert got.is_marked is False and got.marked_at is None
         assert got.published_at == datetime(2026, 1, 2, 3, 4, tzinfo=UTC)
         assert s.get(Feed, feed.id).enabled is True
         with pytest.raises(StatementError):
