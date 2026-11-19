@@ -7,6 +7,7 @@ import {
   MOBILE_BACK_SLOT_ID,
   SHELL_REFRESH_EVENT,
 } from "@/components/AppShell";
+import { BookmarkIcon } from "@/components/BookmarkIcon";
 import { useToast } from "@/components/Toast";
 import { ApiErrorPanel, LoadingSkeleton } from "@/components/states";
 import { api } from "@/lib/api/client";
@@ -170,6 +171,33 @@ export default function ArticleDetailPage() {
     else router.push(fromSummary ? "/" : "/articles");
   };
 
+  const toggleMark = async () => {
+    if (!article) return;
+    const was = article.is_marked;
+    const apply = async (next: boolean) => {
+      try {
+        await api.setArticleMarked(article.id, next);
+      } catch {
+        toast(
+          next
+            ? "マークできませんでした。時間をおいて再度お試しください。"
+            : "マークを外せませんでした。時間をおいて再度お試しください。",
+          "error",
+        );
+        return false;
+      }
+      setArticle((cur) =>
+        cur && cur.id === article.id ? { ...cur, is_marked: next } : cur,
+      );
+      return true;
+    };
+    if (!(await apply(!was))) return;
+    toast(was ? "マークを外しました" : "マークしました", "info", {
+      label: "元に戻す",
+      onClick: () => void apply(was),
+    });
+  };
+
   const toggle = async () => {
     if (!article) return;
     const next = !article.is_read;
@@ -298,6 +326,16 @@ export default function ArticleDetailPage() {
             aria-hidden="true"
           />
           {article.is_read ? "未読に戻す" : "既読にする"}
+        </button>
+        <button
+          type="button"
+          className={`det-mark${article.is_marked ? " is-on" : ""}`}
+          aria-pressed={article.is_marked}
+          aria-label={article.is_marked ? "マークを外す" : "マークする"}
+          title={article.is_marked ? "マークを外す" : "マークする"}
+          onClick={() => void toggleMark()}
+        >
+          <BookmarkIcon filled={article.is_marked} />
         </button>
       </div>
       <div className="det-note">

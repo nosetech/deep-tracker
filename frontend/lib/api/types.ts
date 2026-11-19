@@ -44,6 +44,7 @@ export type ArticleListItem = {
   excerpt: string | null;
   published_at: string | null;
   is_read: boolean;
+  is_marked: boolean;
 };
 
 export type ArticleNeighbor = {
@@ -62,6 +63,8 @@ export type ArticleDetail = {
   fetched_at: string;
   is_read: boolean;
   read_at: string | null;
+  is_marked: boolean;
+  marked_at: string | null;
   newer: ArticleNeighbor | null;
   older: ArticleNeighbor | null;
 };
@@ -73,6 +76,12 @@ export type ArticleList = {
   per_page: number;
 };
 
+export type MarkState = {
+  id: number;
+  is_marked: boolean;
+  marked_at: string | null;
+};
+
 export type ReadState = {
   id: number;
   is_read: boolean;
@@ -81,6 +90,7 @@ export type ReadState = {
 
 export type ArticleQuery = {
   unread_only?: boolean;
+  marked_only?: boolean;
   feed_id?: number;
   since?: string;
   q?: string;
