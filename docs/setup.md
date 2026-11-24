@@ -14,10 +14,12 @@ cd backend && uv sync && cd ..
 (cd frontend && npm install)
 scripts/start.sh               # backend と frontend をバックグラウンドで起動
 scripts/stop.sh                # 両方を停止（未起動でもエラーにならない）
+scripts/backend_start.sh       # backend だけ起動（frontend_start.sh / backend_stop.sh / frontend_stop.sh も同様）
 ```
 
 - `scripts/start.sh` は frontend が未ビルドなら自動で `npm run build` する。`/api/*` の中継先（`BACKEND_URL`）は実行時に読まれるため、`backend.port` を変えてもビルドし直しは不要開発サーバで起動するには `FRONTEND_MODE=dev scripts/start.sh`
 - PID は `logs/deep-tracker.<instance>.{backend,frontend}.pid`、ログは `logs/{backend,backend.stderr,frontend}.log` に出る（[ログ](#6-ログ)の日次ローテーションを参照）。`instance` ごとにPIDが分かれるため、展開先を分ければ並行稼働できる
+- `scripts/start.sh` / `stop.sh` は `{backend,frontend}_{start,stop}.sh` を順に呼ぶ（start は backend → frontend、stop は frontend → backend）。PID・ログ・環境変数（`FRONTEND_MODE` / `LAN_IP` / `TAILSCALE_IP`）は一括と個別で共通のため、片方だけの再起動や、一括起動→個別停止の混在ができる。プロセス単位で管理するツールへは個別スクリプトを登録する。launchd 登録中は個別 start も拒否される
 - 二重起動は拒否される。異常終了でPIDファイルが残っていても、次の `scripts/start.sh` は起動できる
 
 | 設定 | 動作 |
