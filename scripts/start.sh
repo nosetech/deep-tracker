@@ -21,10 +21,13 @@ mkdir -p "$LOG_DIR"
 resolve_frontend_mode
 (guard_start backend)
 (guard_start frontend)
+# ビルド失敗で backend だけが残らないよう、backend を起動する前にビルドする（ビルド済みなら何もしない）
+if [[ "$MODE" == start ]]; then
+    ensure_frontend_build
+fi
 
-export DEEP_TRACKER_BATCH=1
-"$dir/backend_start.sh"
-"$dir/frontend_start.sh"
+DEEP_TRACKER_BATCH=1 "$dir/backend_start.sh"
+DEEP_TRACKER_BATCH=1 "$dir/frontend_start.sh"
 
 print_frontend_notice
 echo "起動しました: backend http://127.0.0.1:$BACKEND_PORT / frontend http://$FRONTEND_HOST:$FRONTEND_PORT"
