@@ -47,6 +47,7 @@ cp config/config.yaml.example config/config.yaml
 ```sh
 scripts/start.sh   # backend と frontend をバックグラウンドで起動（frontend は未ビルドなら自動でビルドする）
 scripts/stop.sh    # 両方を停止
+# 片方だけ: scripts/{backend,frontend}_{start,stop}.sh（一括と混在して停止できる）
 ```
 
 backend は `127.0.0.1:8700`、frontend は既定で `127.0.0.1`、ポートは `config.yaml` の `frontend.port` で待ち受ける。ログは `logs/` に出る。JST 0時に日次ローテーションし、`config.yaml` の `logging.retention_days`（既定7日）を超えた世代は自動削除される。

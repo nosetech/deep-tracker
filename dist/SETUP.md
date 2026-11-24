@@ -63,6 +63,10 @@ cp .env.example .env
 ```bash
 scripts/start.sh   # backend と frontend をバックグラウンドで起動
 scripts/stop.sh    # 停止
+
+# 片方だけ起動・停止する場合（PID・ログは一括と共通なので、混在して停止できます）
+scripts/backend_start.sh  / scripts/backend_stop.sh
+scripts/frontend_start.sh / scripts/frontend_stop.sh
 ```
 
 ブラウザで `http://127.0.0.1:3700`（`LAN_IP` / `TAILSCALE_IP` を指定した場合はそのIP、ポートは `frontend.port`）を開きます。ログは `logs/{backend,backend.stderr,frontend}.log` です（JST 0時に日次ローテーションし、`config.yaml` の `logging.retention_days`（既定7日）を超えた世代は自動削除されます）。
@@ -78,7 +82,7 @@ scripts/service.sh uninstall # 登録を解除
 ```
 
 - `LAN_IP` / `TAILSCALE_IP` は `install` 時の値が plist に固定されます。変えるときは `.env` を直して `install` を再実行してください
-- `scripts/start.sh` と `service.sh` は同時には使えません（二重起動を防ぐため、片方が動いていると拒否されます）
+- `scripts/start.sh` と `service.sh` は同時には使えません（二重起動を防ぐため、片方が動いていると拒否されます。個別の `{backend,frontend}_start.sh` も同様です）
 
 ## 4. 定期実行ジョブの登録
 

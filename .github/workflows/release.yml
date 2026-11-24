@@ -111,6 +111,7 @@ jobs:
           find "${ROOT}/backend" \( -name __pycache__ -o -name '*.egg-info' \) -prune -exec rm -rf {} +
           # 開発用と共通実体のスクリプト・plistは複製せず、ここで直接コピーする（二重管理を避ける）
           cp scripts/start.sh scripts/stop.sh scripts/lib.sh scripts/service.sh \
+             scripts/backend_start.sh scripts/backend_stop.sh scripts/frontend_start.sh scripts/frontend_stop.sh \
              scripts/fetch-job.sh scripts/summary-job.sh scripts/backup-job.sh scripts/*.plist.example "${ROOT}/scripts/"
           # 配布専用のファイル
           cp dist/scripts/migrate.sh dist/scripts/_migrate_helper.py "${ROOT}/scripts/"
@@ -123,6 +124,7 @@ jobs:
                    backend/pyproject.toml backend/uv.lock backend/alembic.ini \
                    frontend/server.js frontend/.next/BUILD_ID frontend/.next/static \
                    scripts/start.sh scripts/stop.sh scripts/lib.sh scripts/service.sh \
+                   scripts/backend_start.sh scripts/backend_stop.sh scripts/frontend_start.sh scripts/frontend_stop.sh \
                    scripts/fetch-job.sh scripts/summary-job.sh scripts/backup-job.sh scripts/migrate.sh scripts/_migrate_helper.py \
                    scripts/com.nosetech.deep-tracker.backend.plist.example \
                    scripts/com.nosetech.deep-tracker.frontend.plist.example \
