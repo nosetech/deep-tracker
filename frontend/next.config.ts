@@ -17,9 +17,6 @@ const nextConfig: NextConfig = {
   output: process.env.NEXT_OUTPUT === "standalone" ? "standalone" : undefined,
   allowedDevOrigins,
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
-  experimental: {
-    agentUpgrade: "security",
-  },
 };
 
 export default nextConfig;
