@@ -235,6 +235,7 @@ config/
 
 - バックエンド起動時にワーカーを `ai.max_concurrent_jobs`（既定1＝逐次）本起動し、`pending` を作成順に処理する。取得は `UPDATE ... WHERE status='pending'` で行い、二重実行しない。
 - 失敗時は `error` に理由を保存し、自動リトライはしない。利用制限エラーは `error` が「利用制限に達しました」で始まり、API の `rate_limited` が true になる（GUIは再試行を促す）。
+- 利用制限に達した場合は、その時点で待機中（`pending`）のジョブを種別を問わず実行せずに `failed` とし、`error` に「利用制限に達しました: 先に実行したAIジョブ（id=N）が利用制限に達したため、実行しませんでした（解除予定: …）」を保存する（`rate_limited` が true になり、GUIから再試行できる）。制限中に1件ずつCLIを呼んで失敗し続けないため。実行中のジョブには影響しない。その後に追加されたジョブは通常どおり実行する。
 - 起動時に `running` のまま残ったジョブは `failed`（再起動により中断）として整理する。
 - 状態取得API: `GET /api/ai-jobs`（`status` / `kind` / `limit`）、`GET /api/ai-jobs/{id}`。
 
