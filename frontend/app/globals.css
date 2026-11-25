@@ -2741,3 +2741,213 @@ html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .nav-dot {
     font-size: 21px;
   }
 }
+
+/* 記事の翻訳表示 (#126) */
+.tr-badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 18px;
+  padding: 0 5px;
+  border: 1px solid var(--line2);
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--tx2);
+}
+
+.tr-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 36px;
+  margin-left: 4px;
+}
+
+.tr-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 5px;
+  background: var(--surface2);
+  color: var(--tx2);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tr-switch {
+  border: 0;
+  background: none;
+  padding: 6px;
+  cursor: pointer;
+  color: var(--ac);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.tr-tools.is-compact {
+  display: flex;
+  flex-wrap: wrap;
+  height: auto;
+  margin: 10px 0 0;
+}
+
+.tr-tools.is-compact .tr-label {
+  gap: 4px;
+  height: 22px;
+  padding: 0 7px;
+  font-size: 11.5px;
+}
+
+.tr-tools.is-compact .tr-switch {
+  padding: 4px 5px;
+  font-size: 12.5px;
+}
+
+.tr-btn {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 7px;
+  border: 1px solid var(--line2);
+  background: transparent;
+  font-size: 13px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.tr-btn.is-running {
+  cursor: default;
+  color: var(--tx2);
+}
+
+.tr-btn.is-compact {
+  margin-top: 10px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  gap: 6px;
+}
+
+.tr-err {
+  border: 1px solid var(--errLine);
+  background: var(--errSoft);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 24px;
+  max-width: 38em;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tr-err-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--err);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.tr-err p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--tx);
+  text-wrap: pretty;
+}
+
+.tr-err-code {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--tx2);
+  overflow-wrap: anywhere;
+}
+
+.tr-err-actions {
+  margin-top: 4px;
+}
+
+.tr-err-retry {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 7px;
+  border: 0;
+  background: var(--tx);
+  color: var(--bg);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.tr-err.is-compact {
+  border-radius: 9px;
+  padding: 12px 14px;
+  margin-bottom: 20px;
+  max-width: none;
+  gap: 4px;
+}
+
+.tr-err.is-compact .tr-err-title {
+  gap: 7px;
+  font-size: 13.5px;
+}
+
+.tr-err.is-compact p {
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+.tr-err-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.tr-err.is-compact .tr-err-code {
+  font-size: 11.5px;
+}
+
+.tr-err.is-compact .tr-err-retry {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 6px;
+  font-size: 12.5px;
+}
+
+.tr-partial {
+  margin-top: 8px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--surface2);
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--tx2);
+  max-width: 38em;
+}
+
+.tr-partial.is-compact {
+  padding: 10px 12px;
+  font-size: 12.5px;
+  max-width: none;
+}
+
+.tr-partial button {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--ac);
+  font: inherit;
+  cursor: pointer;
+}

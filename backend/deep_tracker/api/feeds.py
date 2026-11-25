@@ -3,7 +3,7 @@ from typing import Annotated
 from urllib.parse import urlparse
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
@@ -132,6 +132,13 @@ def _build_out(feed: Feed, article_count: int, unread_count: int) -> FeedOut:
     )
 
 
+def _wake_ai_runner(request: Request) -> None:
+    """取得で翻訳ジョブを投入した場合に備え、AIジョブの実行を起こす。"""
+    runner = getattr(request.app.state, "ai_runner", None)
+    if runner is not None:
+        runner.notify()
+
+
 def _get_feed(session: Session, feed_id: int) -> Feed:
     feed = session.get(Feed, feed_id)
     if feed is None:
@@ -159,13 +166,17 @@ def list_feeds(session: SessionDep) -> list[FeedOut]:
 
 
 @router.post("", response_model=FeedOut, status_code=201)
-def create_feed(body: FeedCreate, session: SessionDep, client: ClientDep) -> FeedOut:
+def create_feed(
+    body: FeedCreate, request: Request, session: SessionDep, client: ClientDep
+) -> FeedOut:
     url = _validate_url(body.url)
     if session.scalar(select(Feed.id).where(Feed.url == url)) is not None:
         raise _error(409, ERROR_DUPLICATE_URL, "このフィードは既に登録されています")
     name = body.name.strip() if body.name else None
     try:
-        feed = register_feed(session, url, name or None, client=client)
+        feed = register_feed(
+            session, url, name or None, client=client, translation=get_settings().translation
+        )
     except IntegrityError:
         # 重複チェックと登録の間に同じURLが登録された場合
         session.rollback()
@@ -174,11 +185,14 @@ def create_feed(body: FeedCreate, session: SessionDep, client: ClientDep) -> Fee
         raise _fetch_failed(exc) from exc
     except FeedParseError as exc:
         raise _error(422, ERROR_NOT_A_FEED, describe_error(exc)) from exc
+    _wake_ai_runner(request)
     return _feed_out(session, feed)
 
 
 @router.patch("/{feed_id}", response_model=FeedOut)
-def update_feed(feed_id: int, body: FeedUpdate, session: SessionDep, client: ClientDep) -> FeedOut:
+def update_feed(
+    feed_id: int, body: FeedUpdate, request: Request, session: SessionDep, client: ClientDep
+) -> FeedOut:
     feed = _get_feed(session, feed_id)
     sent = body.model_fields_set
     new_url = _validate_url(body.url) if "url" in sent and body.url is not None else None
@@ -189,7 +203,9 @@ def update_feed(feed_id: int, body: FeedUpdate, session: SessionDep, client: Cli
         if other is not None:
             raise _error(409, ERROR_DUPLICATE_URL, "このフィードは既に登録されています")
         try:
-            change_feed_url(session, feed, new_url, client=client)
+            change_feed_url(
+                session, feed, new_url, client=client, translation=get_settings().translation
+            )
         except IntegrityError:
             session.rollback()
             raise _error(409, ERROR_DUPLICATE_URL, "このフィードは既に登録されています") from None
@@ -199,6 +215,7 @@ def update_feed(feed_id: int, body: FeedUpdate, session: SessionDep, client: Cli
         except FeedParseError as exc:
             session.rollback()
             raise _error(422, ERROR_NOT_A_FEED, describe_error(exc)) from exc
+        _wake_ai_runner(request)
     if "name" in sent:
         feed.name = (body.name or "").strip()
     if "fetch_interval_minutes" in sent:
@@ -217,8 +234,9 @@ def delete_feed(feed_id: int, session: SessionDep) -> None:
 
 
 @router.post("/{feed_id}/fetch", response_model=FetchOut)
-def fetch_now(feed_id: int, session: SessionDep, client: ClientDep) -> FetchOut:
+def fetch_now(feed_id: int, request: Request, session: SessionDep, client: ClientDep) -> FetchOut:
     """有効/無効にかかわらず今すぐ1回取得する。失敗は例外にせず last_fetch_* に反映する。"""
     feed = _get_feed(session, feed_id)
-    added = fetch_and_store(session, feed, client=client)
+    added = fetch_and_store(session, feed, client=client, translation=get_settings().translation)
+    _wake_ai_runner(request)
     return FetchOut(added=added, feed=_feed_out(session, feed))

@@ -97,6 +97,13 @@ class AISettings(_Section):
     max_concurrent_jobs: int = Field(1, ge=1)
 
 
+class TranslationSettings(_Section):
+    # 日本語以外の新着記事を取得時に自動で翻訳ジョブに投入するか。false でも手動翻訳はできる
+    enabled: bool = True
+    # 1回の取得で自動投入する翻訳ジョブの上限（新しい順）。超過分は未翻訳のまま残る
+    max_per_fetch: int = Field(20, ge=1)
+
+
 class FeedSettings(_Section):
     fetch_interval_minutes: int = Field(60, ge=1)
 
@@ -113,3 +120,4 @@ class Settings(_Section):
     slack: SlackSettings = SlackSettings()
     feed: FeedSettings = FeedSettings()
     ai: AISettings = AISettings()
+    translation: TranslationSettings = TranslationSettings()

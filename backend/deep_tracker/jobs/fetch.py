@@ -67,7 +67,9 @@ def run_fetch(
         if not is_due(feed, settings.feed.fetch_interval_minutes, now):
             continue
         report.due += 1
-        report.added += fetch_and_store(session, feed, client=client)
+        report.added += fetch_and_store(
+            session, feed, client=client, translation=settings.translation
+        )
         if feed.last_fetch_ok is False:
             report.failed.append((feed.url, feed.last_fetch_error or "不明なエラー"))
     return report

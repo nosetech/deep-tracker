@@ -3,6 +3,12 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ErrorPanel } from "@/components/states";
+import {
+  PartialTranslationNote,
+  TranslationActions,
+  TranslationError,
+  useArticleTranslation,
+} from "@/components/Translation";
 import { api } from "@/lib/api/client";
 import type { ArticleDetail } from "@/lib/api/types";
 import { formatFull } from "@/lib/format";
@@ -68,7 +74,13 @@ export function ArticlePreview({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, reloadKey]);
 
-  const content = article?.content;
+  // 翻訳済みなら日本語を既定で表示し、原文にも切り替えられる
+  const tr = useArticleTranslation(article, (articleId, patch) =>
+    setArticle((cur) =>
+      cur && cur.id === articleId ? { ...cur, ...patch } : cur,
+    ),
+  );
+  const content = tr.content;
   const html = useMemo(() => (content ? sanitizeHtml(content) : ""), [content]);
   const url = article?.url ?? null;
 
@@ -106,8 +118,16 @@ export function ArticlePreview({
                 {formatFull(article.published_at ?? article.fetched_at)}
               </span>
             </div>
-            <h2 className="pv-title">{article.title}</h2>
-            <div className="pv-content">
+            <h2 className="pv-title" lang={tr.lang}>
+              {tr.title}
+            </h2>
+            <TranslationActions tr={tr} compact />
+            <div className="pv-content" lang={tr.lang}>
+              <TranslationError
+                tr={tr}
+                error={article.translation_job?.error ?? null}
+                compact
+              />
               {html ? (
                 <div
                   className="det-body"
@@ -116,6 +136,7 @@ export function ArticlePreview({
               ) : (
                 <p className="det-nobody">本文はフィードに含まれていません。</p>
               )}
+              <PartialTranslationNote tr={tr} compact />
             </div>
             <div className="pv-actions">
               {url && (

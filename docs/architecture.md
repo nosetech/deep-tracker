@@ -195,6 +195,12 @@ config/
 | read_at      | datetime NULL         | 既読日時                                        |
 | is_marked    | boolean               | マークフラグ（既定 false）。既読とは独立        |
 | marked_at    | datetime NULL         | マーク日時                                      |
+| language     | text NULL             | 言語判定の結果（`ja` / `other`）。NULL は未判定（翻訳機能の追加前の記事。APIはその場で判定して返す） |
+| title_ja / content_ja | text NULL    | 日本語訳。未翻訳は NULL。原文（`title` / `content`）は変更しない |
+| translated_at | datetime NULL        | 翻訳日時                                        |
+| translation_truncated | boolean      | 本文が長いため先頭のみ翻訳した（既定 false）    |
+
+言語判定（`deep_tracker/translate/detect.py`）はAIを使わず、HTMLタグを除いたタイトル＋本文で、仮名の文字数が「仮名＋漢字＋ハングルの文字数＋ラテン文字等の単語数」の15%以上なら日本語とする（漢字のみの中国語は日本語以外）。新規記事の保存時に判定して `language` に保存し、日本語以外の記事は設定 `translation.enabled` が true なら新しい順に `translation.max_per_fetch` 件まで `translate_article` ジョブに投入する（定期取得バッチ・フィード登録・URL変更・今すぐ取得のいずれも同じ）。翻訳は本文の先頭 20,000 文字まで（タグの途中では切らない）で、HTMLは保ったまま訳させる（表示時に `sanitizeHtml` を通す）。プロンプトは `backend/deep_tracker/translate/prompts/translate.md`、出力は `{"title", "content"}` のJSON。手動翻訳は `POST /api/articles/{id}/translate`（翻訳済みは409。待機中・実行中のジョブがあればそれを返す）。記事詳細APIは最新の翻訳ジョブ（`translation_job`）を返し、GUIは翻訳中・失敗・利用制限を表示する。
 
 **summaries**（サマリ）
 
@@ -217,7 +223,7 @@ config/
 | カラム                                | 型         | 説明                                           |
 | ------------------------------------- | ---------- | ---------------------------------------------- |
 | id                                    | integer PK |                                                |
-| kind                                  | text       | ジョブ種別（例: `summary`）                    |
+| kind                                  | text       | ジョブ種別（`summary` / `translate_article`）  |
 | status                                | text       | `pending` / `running` / `succeeded` / `failed` |
 | input / result                        | JSON NULL  | 入力・結果                                     |
 | error                                 | text NULL  | 失敗理由                                       |

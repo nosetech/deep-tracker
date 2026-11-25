@@ -6,6 +6,7 @@ import { SHELL_REFRESH_EVENT } from "@/components/AppShell";
 import { BookmarkIcon } from "@/components/BookmarkIcon";
 import { useToast } from "@/components/Toast";
 import { ApiErrorPanel, LoadingSkeleton } from "@/components/states";
+import { TranslatedBadge } from "@/components/Translation";
 import { api } from "@/lib/api/client";
 import type { ArticleListItem, Feed } from "@/lib/api/types";
 import { loadSessionState, saveSessionState } from "@/lib/session-state";
@@ -572,12 +573,13 @@ export default function ArticlesPage() {
                 >
                   <span className="art-dot" aria-hidden="true" />
                   <span className="art-body">
-                    <span className="art-title">{a.title}</span>
+                    <span className="art-title">{a.title_ja ?? a.title}</span>
                     <span className="art-meta">
                       <span className="art-meta-feed">{a.feed_name}</span>
                       {d && (
                         <span className="art-meta-time">{formatTime(d)}</span>
                       )}
+                      {a.translated_at && <TranslatedBadge />}
                     </span>
                     {a.excerpt && (
                       <span className="art-excerpt">

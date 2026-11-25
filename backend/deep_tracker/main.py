@@ -15,7 +15,10 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     from deep_tracker.ai import create_provider
     from deep_tracker.config import get_settings
     from deep_tracker.jobs.ai_jobs import AIJobRunner, recover_interrupted_jobs
-    from deep_tracker.summary.service import JOB_KIND, make_summary_handler
+    from deep_tracker.summary.service import JOB_KIND as SUMMARY_JOB
+    from deep_tracker.summary.service import make_summary_handler
+    from deep_tracker.translate.service import JOB_KIND as TRANSLATE_JOB
+    from deep_tracker.translate.service import make_translate_handler
 
     settings = get_settings()
     factory = _session_factory()
@@ -25,7 +28,10 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     runner = AIJobRunner(
         factory,
         create_provider(settings.ai),
-        handlers={JOB_KIND: make_summary_handler(factory)},
+        handlers={
+            SUMMARY_JOB: make_summary_handler(factory),
+            TRANSLATE_JOB: make_translate_handler(factory),
+        },
         concurrency=settings.ai.max_concurrent_jobs,
     )
     runner.start()
