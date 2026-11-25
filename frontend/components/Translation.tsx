@@ -82,8 +82,19 @@ export function useArticleTranslation(
             },
           });
         }
-      } catch {
-        // 通信に失敗しても次の確認で取り直す
+      } catch (e: unknown) {
+        // ジョブ・記事が消えた（404）場合は確認をやめて失敗として表示する。
+        // それ以外の通信の失敗は次の確認で取り直す
+        if (!cancelled && (e as { status?: number }).status === 404) {
+          onPatch(id, {
+            translation_job: {
+              id: jobId,
+              status: "failed",
+              error: "翻訳ジョブが見つかりません",
+              rate_limited: false,
+            },
+          });
+        }
       }
     }, POLL_MS);
     return () => {

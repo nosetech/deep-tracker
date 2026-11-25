@@ -94,5 +94,5 @@ test("失敗・利用制限の文言", () => {
   );
   const failed = translationErrorView("failed", "翻訳の出力が不正です");
   assert.equal(failed.title, "翻訳できませんでした");
-  assert.equal(failed.code, "translate_failed · 翻訳の出力が不正です");
+  assert.equal(failed.code, "translate_failed");
 });

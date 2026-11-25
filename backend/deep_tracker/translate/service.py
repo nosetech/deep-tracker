@@ -92,7 +92,7 @@ def translate_article(session: Session, provider: AIProvider, article: Article) 
     article.content_ja = output["content"] or None
     article.translation_truncated = truncated
     article.translated_at = utcnow()
-    article.language = LANG_OTHER
+    # language は判定結果のまま残す（手動翻訳した日本語の記事を other に書き換えない）
     session.commit()
 
 

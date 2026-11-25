@@ -51,6 +51,7 @@ export function translationErrorView(
   return {
     title: "翻訳できませんでした",
     text: "原文のまま表示しています。時間をおいて、もう一度お試しください。",
-    code: error ? `translate_failed · ${error}` : "translate_failed",
+    // 失敗理由の全文は ai_jobs に残る。画面はデザインどおり種別のみ示す
+    code: "translate_failed",
   };
 }

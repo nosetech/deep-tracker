@@ -374,6 +374,52 @@ def test_api_add_feed_enqueues(client, factory):
         assert len(translate_jobs(s)) == 3
 
 
+def test_api_change_url_and_fetch_now_enqueue(client, factory):
+    with factory() as s:
+        feed = Feed(name="EN", url="https://example.com/old.rss")
+        s.add(feed)
+        s.commit()
+        feed_id = feed.id
+    res = client.patch(f"/api/feeds/{feed_id}", json={"url": "https://example.com/rss"})
+    assert res.status_code == 200
+    with factory() as s:
+        assert len(translate_jobs(s)) == 3
+        # 既存記事は再投入されない。新着記事のみ投入される
+        s.query(Article).filter(Article.guid == "en-2").delete()
+        s.commit()
+    assert client.post(f"/api/feeds/{feed_id}/fetch").json()["added"] == 1
+    with factory() as s:
+        assert len(translate_jobs(s)) == 4
+
+
+def test_api_wakes_ai_runner(client, factory):
+    class Runner:
+        notified = 0
+
+        def notify(self):
+            Runner.notified += 1
+
+    app.state.ai_runner = Runner()
+    try:
+        with factory() as s:
+            article_id = add_article(s).id
+        assert client.post(f"/api/articles/{article_id}/translate").status_code == 202
+        res = client.post("/api/feeds", json={"url": "https://example.com/other.rss"})
+        assert res.status_code == 201
+        assert Runner.notified == 2
+    finally:
+        del app.state.ai_runner
+
+
+def test_manual_translation_keeps_detected_language(factory):
+    with factory() as s:
+        article_id = add_article(s, title="日本語の記事です", language="ja").id
+    run_job(factory, MockProvider(), article_id)
+    with factory() as s:
+        a = s.get(Article, article_id)
+        assert a.language == "ja" and a.translated_at is not None
+
+
 def test_api_manual_translate(client, factory):
     with factory() as s:
         article_id = add_article(s).id
