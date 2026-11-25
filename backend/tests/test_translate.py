@@ -459,6 +459,20 @@ def test_api_manual_translate_after_failure_creates_new_job(client, factory):
     assert res.json()["job_id"] != failed_id
 
 
+def test_api_translation_cancelled_by_rate_limit(client, factory):
+    from deep_tracker.jobs.ai_jobs import cancel_pending_jobs
+
+    with factory() as s:
+        article_id = add_article(s).id
+    client.post(f"/api/articles/{article_id}/translate")
+    with factory() as s:
+        cancel_pending_jobs(s, 1, "15:00")
+    job = client.get(f"/api/articles/{article_id}").json()["translation_job"]
+    assert job["status"] == "failed"
+    assert job["rate_limited"] is True
+    assert job["error"].endswith("（解除予定: 15:00）")
+
+
 def test_api_returns_translation_fields(client, factory):
     with factory() as s:
         a = add_article(

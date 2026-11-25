@@ -62,6 +62,7 @@ def cancel_pending_jobs(session: Session, cause_job_id: int, reset_text: str | N
     """利用制限に達したとき、待機中のジョブを実行せずに失敗（利用制限）として整理する。
 
     制限中に1件ずつCLIを呼んで失敗し続けないため。画面からは通常の利用制限と同じく再試行できる。
+    実行中のジョブは対象外。中止したジョブは started_at が NULL のまま finished_at だけが入る。
     """
     error = (
         f"{RATE_LIMIT_ERROR_PREFIX}: 先に実行したAIジョブ（id={cause_job_id}）が利用制限に"
@@ -139,6 +140,7 @@ class AIJobRunner:
             if job_id is None:
                 return False
             job = session.get(AiJob, job_id)
+            rate_limit: RateLimitError | None = None
             try:
                 handler = self._handlers.get(job.kind)
                 if handler is None:
@@ -150,13 +152,13 @@ class AIJobRunner:
                 logger.warning("AIジョブ %d (%s) が失敗しました: %s", job.id, job.kind, e)
                 job.status = STATUS_FAILED
                 job.error = _failure_message(e)
-                rate_limit = e if isinstance(e, RateLimitError) else None
-            else:
-                rate_limit = None
+                if isinstance(e, RateLimitError):
+                    rate_limit = e
             job.finished_at = utcnow()
             session.commit()
             if rate_limit is not None:
-                # キューに残ったジョブも制限中は失敗するため、実行せずに止める
+                # キューに残ったジョブも制限中は失敗するため、実行せずに止める。
+                # 失敗の記録とは別に commit し、中止に失敗しても元のジョブの記録は残す
                 cancel_pending_jobs(session, job.id, rate_limit.reset_text)
         return True
 

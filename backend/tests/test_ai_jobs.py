@@ -124,6 +124,23 @@ def test_rate_limit_cancels_pending_jobs(factory):
     assert get_job(factory, retry).status == "succeeded"
 
 
+def test_cancel_pending_jobs_without_reset_text_keeps_running(factory):
+    from deep_tracker.jobs.ai_jobs import cancel_pending_jobs
+
+    with factory() as s:
+        running = enqueue_job(s, "x")
+        running.status = "running"
+        s.commit()
+        running_id = running.id
+        pending_id = enqueue_job(s, "x").id
+        assert cancel_pending_jobs(s, 99, None) == 1
+    job = get_job(factory, pending_id)
+    assert is_rate_limited(job)
+    assert "解除予定" not in job.error
+    assert job.started_at is None and job.finished_at is not None
+    assert get_job(factory, running_id).status == "running"
+
+
 def test_other_errors_do_not_cancel_pending_jobs(factory):
     def ai_fail(_i, _p):
         raise AIError("boom")
