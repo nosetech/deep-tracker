@@ -9,6 +9,12 @@ import {
 } from "@/components/AppShell";
 import { BookmarkIcon } from "@/components/BookmarkIcon";
 import { useToast } from "@/components/Toast";
+import {
+  PartialTranslationNote,
+  TranslationActions,
+  TranslationError,
+  useArticleTranslation,
+} from "@/components/Translation";
 import { ApiErrorPanel, LoadingSkeleton } from "@/components/states";
 import { api } from "@/lib/api/client";
 import { formatFull } from "@/lib/format";
@@ -148,7 +154,13 @@ export default function ArticleDetailPage() {
     setBackSlot(document.getElementById(MOBILE_BACK_SLOT_ID));
   }, []);
 
-  const content = article?.content;
+  // 翻訳済みなら日本語を既定で表示し、原文にも切り替えられる
+  const tr = useArticleTranslation(article, (articleId, patch) =>
+    setArticle((cur) =>
+      cur && cur.id === articleId ? { ...cur, ...patch } : cur,
+    ),
+  );
+  const content = tr.content;
   const html = useMemo(() => (content ? sanitizeHtml(content) : ""), [content]);
 
   // サマリの元記事から開いた場合は、戻り先をサマリにする
@@ -291,7 +303,9 @@ export default function ArticleDetailPage() {
         <span className="det-feed">{article.feed_name}</span>
         <span className="det-date">{formatFull(when)}</span>
       </div>
-      <h1 className="det-title">{article.title}</h1>
+      <h1 className="det-title" lang={tr.lang}>
+        {tr.title}
+      </h1>
       <div className="det-actions">
         {article.url && (
           <a
@@ -337,13 +351,18 @@ export default function ArticleDetailPage() {
         >
           <BookmarkIcon filled={article.is_marked} />
         </button>
+        <TranslationActions tr={tr} />
       </div>
       <div className="det-note">
         {article.is_read
           ? "開いた時点で既読になりました"
           : "未読として残しています"}
       </div>
-      <div className="det-content">
+      <div className="det-content" lang={tr.lang}>
+        <TranslationError
+          tr={tr}
+          error={article.translation_job?.error ?? null}
+        />
         {html ? (
           <div
             className="det-body"
@@ -352,6 +371,7 @@ export default function ArticleDetailPage() {
         ) : (
           <p className="det-nobody">本文はフィードに含まれていません。</p>
         )}
+        <PartialTranslationNote tr={tr} />
       </div>
       <div className="det-navwrap">
         <div className="det-nav-head">

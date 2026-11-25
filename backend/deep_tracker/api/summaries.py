@@ -67,6 +67,7 @@ class SummaryListItem(BaseModel):
 
 class SummarySource(BaseModel):
     id: int
+    # 翻訳済みなら日本語訳
     title: str
     url: str | None
     feed_name: str
@@ -160,7 +161,7 @@ def _detail(session: Session, s: Summary) -> SummaryDetail:
         sources = [
             SummarySource(
                 id=a.id,
-                title=a.title,
+                title=a.title_ja or a.title,
                 url=a.url,
                 feed_name=feed_names.get(a.feed_id, ""),
                 published_at=_as_utc(a.published_at) if a.published_at else None,

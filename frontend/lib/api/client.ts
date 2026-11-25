@@ -1,4 +1,5 @@
 import type {
+  AiJob,
   AppConfig,
   ArticleDetail,
   ArticleList,
@@ -113,6 +114,11 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ is_marked: isMarked }),
     }),
+  translateArticle: (id: number) =>
+    request<{ job_id: number }>(`/articles/${id}/translate`, {
+      method: "POST",
+    }),
+  getAiJob: (id: number) => request<AiJob>(`/ai-jobs/${id}`),
   getUnreadCounts: () => request<UnreadCounts>("/articles/unread-counts"),
   listSummaries: () => request<SummaryListItem[]>("/summaries"),
   getSummary: (id: number) => request<SummaryDetail>(`/summaries/${id}`),

@@ -1,14 +1,17 @@
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import ColumnElement, and_, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from deep_tracker.api.deps import get_session
-from deep_tracker.db import Article, Feed
+from deep_tracker.db import AiJob, Article, Feed
 from deep_tracker.db.models import utcnow
+from deep_tracker.jobs.ai_jobs import is_rate_limited
+from deep_tracker.translate import detect_language, enqueue_translation
+from deep_tracker.translate.service import latest_job
 
 router = APIRouter()
 
@@ -36,7 +39,8 @@ class ArticleFilter:
         since: datetime | None = Query(None, description="この日時以降（含む）"),
         until: datetime | None = Query(None, description="この日時より前"),
         q: str | None = Query(
-            None, description="タイトル・本文のキーワード検索（空白区切りでAND）"
+            None,
+            description="タイトル・本文（日本語訳を含む）のキーワード検索（空白区切りでAND）",
         ),
     ) -> None:
         self.unread_only = unread_only
@@ -66,6 +70,8 @@ class ArticleFilter:
                 or_(
                     Article.title.like(pattern, escape="\\"),
                     Article.content.like(pattern, escape="\\"),
+                    Article.title_ja.like(pattern, escape="\\"),
+                    Article.content_ja.like(pattern, escape="\\"),
                 )
             )
         return conds
@@ -79,11 +85,17 @@ class ArticleListItem(BaseModel):
     feed_id: int
     feed_name: str
     title: str
+    # 日本語訳。未翻訳は None
+    title_ja: str | None
     url: str | None
+    # 翻訳済みなら日本語訳から作る
     excerpt: str | None
     published_at: datetime | None
     is_read: bool
     is_marked: bool
+    # ja / other。保存時に未判定の記事（翻訳機能の追加前の記事）はその場で判定する
+    language: str
+    translated_at: datetime | None
 
 
 class ArticleList(BaseModel):
@@ -95,7 +107,17 @@ class ArticleList(BaseModel):
 
 class ArticleNeighbor(BaseModel):
     id: int
+    # 翻訳済みなら日本語訳
     title: str
+
+
+class TranslationJob(BaseModel):
+    """記事の最新の翻訳ジョブ。進捗は GET /api/ai-jobs/{id} でも確認できる。"""
+
+    id: int
+    status: str
+    error: str | None
+    rate_limited: bool
 
 
 class ArticleDetail(BaseModel):
@@ -105,6 +127,13 @@ class ArticleDetail(BaseModel):
     title: str
     url: str | None
     content: str | None
+    language: str
+    title_ja: str | None
+    content_ja: str | None
+    translated_at: datetime | None
+    # 本文が長いため先頭のみ翻訳した
+    translation_truncated: bool
+    translation_job: TranslationJob | None
     published_at: datetime | None
     fetched_at: datetime
     is_read: bool
@@ -145,6 +174,10 @@ class MarkState(BaseModel):
     marked_at: datetime | None
 
 
+class TranslateResult(BaseModel):
+    job_id: int
+
+
 class BulkReadResult(BaseModel):
     """未読 → 既読に変更した記事。article_ids を /articles/mark-unread に渡すと元に戻せる。"""
 
@@ -161,6 +194,18 @@ def _excerpt(content: str | None) -> str | None:
         return None
     text = " ".join(content.split())
     return text[:EXCERPT_LENGTH]
+
+
+def _language(article: Article) -> str:
+    return article.language or detect_language(article.title, article.content)
+
+
+def _translation_job(job: AiJob | None) -> TranslationJob | None:
+    if job is None:
+        return None
+    return TranslationJob(
+        id=job.id, status=job.status, error=job.error, rate_limited=is_rate_limited(job)
+    )
 
 
 def _get_article(session: Session, article_id: int) -> Article:
@@ -193,11 +238,14 @@ def list_articles(
             feed_id=a.feed_id,
             feed_name=feed_name,
             title=a.title,
+            title_ja=a.title_ja,
             url=a.url,
-            excerpt=_excerpt(a.content),
+            excerpt=_excerpt(a.content_ja or a.content),
             published_at=a.published_at,
             is_read=a.is_read,
             is_marked=a.is_marked,
+            language=_language(a),
+            translated_at=a.translated_at,
         )
         for a, feed_name in rows
     ]
@@ -233,7 +281,10 @@ def get_article(article_id: int, session: SessionDep, flt: FilterDep) -> Article
             pos = or_(SORT_KEY < key, and_(SORT_KEY == key, Article.id < article.id))
             order = (SORT_KEY.desc(), Article.id.desc())
         row = session.execute(
-            select(Article.id, Article.title).where(pos, *conds).order_by(*order).limit(1)
+            select(Article.id, func.coalesce(Article.title_ja, Article.title))
+            .where(pos, *conds)
+            .order_by(*order)
+            .limit(1)
         ).first()
         return ArticleNeighbor(id=row[0], title=row[1]) if row else None
 
@@ -244,6 +295,12 @@ def get_article(article_id: int, session: SessionDep, flt: FilterDep) -> Article
         title=article.title,
         url=article.url,
         content=article.content,
+        language=_language(article),
+        title_ja=article.title_ja,
+        content_ja=article.content_ja,
+        translated_at=article.translated_at,
+        translation_truncated=article.translation_truncated,
+        translation_job=_translation_job(latest_job(session, article.id)),
         published_at=article.published_at,
         fetched_at=article.fetched_at,
         is_read=article.is_read,
@@ -253,6 +310,22 @@ def get_article(article_id: int, session: SessionDep, flt: FilterDep) -> Article
         newer=neighbor(newer=True),
         older=neighbor(newer=False),
     )
+
+
+@router.post("/articles/{article_id}/translate", response_model=TranslateResult, status_code=202)
+def translate(article_id: int, request: Request, session: SessionDep) -> TranslateResult:
+    """未翻訳の記事を翻訳ジョブに投入する。翻訳中（待機中・実行中）なら、そのジョブを返す。
+
+    設定 translation.enabled（取得時の自動投入）にかかわらず実行できる。
+    """
+    article = _get_article(session, article_id)
+    if article.translated_at is not None:
+        raise HTTPException(status_code=409, detail="この記事は翻訳済みです")
+    job = enqueue_translation(session, article.id)
+    runner = getattr(request.app.state, "ai_runner", None)
+    if runner is not None:
+        runner.notify()
+    return TranslateResult(job_id=job.id)
 
 
 @router.patch("/articles/{article_id}/read", response_model=ReadState)

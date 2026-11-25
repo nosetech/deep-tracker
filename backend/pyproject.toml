@@ -47,3 +47,4 @@ select = ["E", "F", "I", "UP"]
 
 [tool.setuptools.package-data]
 "deep_tracker.summary" = ["prompts/*.md"]
+"deep_tracker.translate" = ["prompts/*.md"]

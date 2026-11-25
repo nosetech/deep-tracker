@@ -35,16 +35,42 @@ export type BulkReadResult = {
   article_ids: number[];
 };
 
+/** 記事の言語判定の結果。other は翻訳の対象 */
+export type ArticleLanguage = "ja" | "other";
+
 export type ArticleListItem = {
   id: number;
   feed_id: number;
   feed_name: string;
   title: string;
+  /** 日本語訳。未翻訳は null */
+  title_ja: string | null;
   url: string | null;
+  /** 翻訳済みなら日本語訳から作られる */
   excerpt: string | null;
   published_at: string | null;
   is_read: boolean;
   is_marked: boolean;
+  language: ArticleLanguage;
+  translated_at: string | null;
+};
+
+/** 記事の最新の翻訳ジョブ */
+export type TranslationJob = {
+  id: number;
+  status: AiJobStatus;
+  error: string | null;
+  rate_limited: boolean;
+};
+
+export type AiJobStatus = "pending" | "running" | "succeeded" | "failed";
+
+export type AiJob = {
+  id: number;
+  kind: string;
+  status: AiJobStatus;
+  error: string | null;
+  rate_limited: boolean;
 };
 
 export type ArticleNeighbor = {
@@ -65,6 +91,13 @@ export type ArticleDetail = {
   read_at: string | null;
   is_marked: boolean;
   marked_at: string | null;
+  language: ArticleLanguage;
+  title_ja: string | null;
+  content_ja: string | null;
+  translated_at: string | null;
+  /** 本文が長いため先頭のみ翻訳した */
+  translation_truncated: boolean;
+  translation_job: TranslationJob | null;
   newer: ArticleNeighbor | null;
   older: ArticleNeighbor | null;
 };

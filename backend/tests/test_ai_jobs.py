@@ -14,6 +14,7 @@ from deep_tracker.jobs.ai_jobs import (
     INTERRUPTED_ERROR,
     AIJobRunner,
     enqueue_job,
+    is_rate_limited,
     recover_interrupted_jobs,
 )
 from deep_tracker.main import app
@@ -87,6 +88,70 @@ def test_rate_limit_error_saved_without_retry(factory):
     assert job.error.startswith("利用制限に達しました")
     assert "3pm" in job.error
     assert job.finished_at is not None
+
+
+def test_rate_limit_cancels_pending_jobs(factory):
+    calls = []
+
+    def limited(_input, _provider):
+        calls.append("limited")
+        raise RateLimitError("limit", reset_text="3pm")
+
+    def ok(_input, _provider):
+        calls.append("ok")
+        return {}
+
+    with factory() as s:
+        first = enqueue_job(s, "limited").id
+        rest = [enqueue_job(s, "ok").id, enqueue_job(s, "summary-like").id]
+    runner = make_runner(factory, {"limited": limited, "ok": ok, "summary-like": ok})
+    assert runner.run_next() is True
+    # 待機中のジョブは実行されずに利用制限として失敗になる
+    assert runner.run_next() is False
+    assert calls == ["limited"]
+    for job_id in rest:
+        job = get_job(factory, job_id)
+        assert job.status == "failed"
+        assert is_rate_limited(job)
+        assert f"id={first}" in job.error
+        assert "（解除予定: 3pm）" in job.error
+        assert job.finished_at is not None
+
+    # 制限後に追加されたジョブは通常どおり実行される（解除後の再試行）
+    with factory() as s:
+        retry = enqueue_job(s, "ok").id
+    assert runner.run_next() is True
+    assert get_job(factory, retry).status == "succeeded"
+
+
+def test_cancel_pending_jobs_without_reset_text_keeps_running(factory):
+    from deep_tracker.jobs.ai_jobs import cancel_pending_jobs
+
+    with factory() as s:
+        running = enqueue_job(s, "x")
+        running.status = "running"
+        s.commit()
+        running_id = running.id
+        pending_id = enqueue_job(s, "x").id
+        assert cancel_pending_jobs(s, 99, None) == 1
+    job = get_job(factory, pending_id)
+    assert is_rate_limited(job)
+    assert "解除予定" not in job.error
+    assert job.started_at is None and job.finished_at is not None
+    assert get_job(factory, running_id).status == "running"
+
+
+def test_other_errors_do_not_cancel_pending_jobs(factory):
+    def ai_fail(_i, _p):
+        raise AIError("boom")
+
+    with factory() as s:
+        enqueue_job(s, "ai")
+        pending = enqueue_job(s, "ok").id
+    runner = make_runner(factory, {"ai": ai_fail, "ok": lambda _i, _p: {}})
+    runner.run_next()
+    runner.run_next()
+    assert get_job(factory, pending).status == "succeeded"
 
 
 def test_other_errors_saved_as_failure(factory):

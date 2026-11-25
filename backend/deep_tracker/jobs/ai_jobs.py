@@ -2,6 +2,7 @@
 
 `ai_jobs` テーブルに状態を保存しながら、待機中のジョブを設定された同時実行数（既定1）で処理する。
 失敗時の自動リトライはしない。利用制限エラーは理由として保存し、再試行は画面から促す。
+利用制限に達した場合は、待機中のジョブも実行せずに失敗（利用制限）として整理する。
 """
 
 import logging
@@ -54,6 +55,30 @@ def recover_interrupted_jobs(session: Session) -> int:
     count = result.rowcount
     if count:
         logger.warning("実行中のまま残ったAIジョブ %d 件を失敗として整理しました", count)
+    return count
+
+
+def cancel_pending_jobs(session: Session, cause_job_id: int, reset_text: str | None) -> int:
+    """利用制限に達したとき、待機中のジョブを実行せずに失敗（利用制限）として整理する。
+
+    制限中に1件ずつCLIを呼んで失敗し続けないため。画面からは通常の利用制限と同じく再試行できる。
+    実行中のジョブは対象外。中止したジョブは started_at が NULL のまま finished_at だけが入る。
+    """
+    error = (
+        f"{RATE_LIMIT_ERROR_PREFIX}: 先に実行したAIジョブ（id={cause_job_id}）が利用制限に"
+        "達したため、実行しませんでした"
+    )
+    if reset_text:
+        error += f"（解除予定: {reset_text}）"
+    result = session.execute(
+        update(AiJob)
+        .where(AiJob.status == STATUS_PENDING)
+        .values(status=STATUS_FAILED, error=error, finished_at=utcnow())
+    )
+    session.commit()
+    count = result.rowcount
+    if count:
+        logger.warning("利用制限に達したため、待機中のAIジョブ %d 件を中止しました", count)
     return count
 
 
@@ -115,6 +140,7 @@ class AIJobRunner:
             if job_id is None:
                 return False
             job = session.get(AiJob, job_id)
+            rate_limit: RateLimitError | None = None
             try:
                 handler = self._handlers.get(job.kind)
                 if handler is None:
@@ -126,8 +152,14 @@ class AIJobRunner:
                 logger.warning("AIジョブ %d (%s) が失敗しました: %s", job.id, job.kind, e)
                 job.status = STATUS_FAILED
                 job.error = _failure_message(e)
+                if isinstance(e, RateLimitError):
+                    rate_limit = e
             job.finished_at = utcnow()
             session.commit()
+            if rate_limit is not None:
+                # キューに残ったジョブも制限中は失敗するため、実行せずに止める。
+                # 失敗の記録とは別に commit し、中止に失敗しても元のジョブの記録は残す
+                cancel_pending_jobs(session, job.id, rate_limit.reset_text)
         return True
 
     def notify(self) -> None:

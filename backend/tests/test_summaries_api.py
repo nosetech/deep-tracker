@@ -173,6 +173,20 @@ def test_generation_failed_rate_limited(client, factory):
     assert client.get(f"/api/summaries/generation?dismissed={job_id}").json()["state"] == "idle"
 
 
+def test_generation_cancelled_by_rate_limit(client, factory):
+    """先に実行した別のジョブが利用制限に達し、待機中のサマリが中止された場合も再試行を促す。"""
+    from deep_tracker.jobs.ai_jobs import cancel_pending_jobs
+
+    _seed(factory)
+    client.post("/api/summaries/generate")
+    with factory() as s:
+        cancel_pending_jobs(s, 1, "15:00")
+    state = client.get("/api/summaries/generation").json()
+    assert state["state"] == "failed"
+    assert state["rate_limited"] is True
+    assert state["reset_text"] == "15:00"
+
+
 @pytest.mark.parametrize("interval", ["daily", "weekly", "monthly"])
 def test_config_returns_next_run(client, monkeypatch, tmp_path, interval):
     cfg = tmp_path / "interval.yaml"
