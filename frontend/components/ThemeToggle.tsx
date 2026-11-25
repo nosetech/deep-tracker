@@ -7,7 +7,7 @@ function readTheme(): Theme {
   return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
 }
 
-// 保存値（手動設定）があればそれを、なければ OS 設定を使う（themeInitScript と同じ判定）
+// 保存値（手動設定）があればそれを、なければ OS 設定を使う（theme.ts の themeInitScript と同じ判定。変更時は両方そろえる）
 function initialTheme(): Theme {
   try {
     const saved = localStorage.getItem(THEME_STORAGE_KEY);

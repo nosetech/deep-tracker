@@ -150,8 +150,9 @@ export default function ArticlesPage() {
   useEffect(() => {
     const saved = loadSessionState(FILTER_STORAGE_KEY, parseFilter);
     if (saved) {
+      // 保存値の q は trim 前の入力値。デバウンス後と同じ値にして、初回の取得を1回で済ませる
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setFilter(saved);
+      setFilter({ ...saved, q: saved.q.trim() });
       setQInput(saved.q);
     }
     setRestored(true);
