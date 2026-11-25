@@ -8,7 +8,13 @@ import { useToast } from "@/components/Toast";
 import { ApiErrorPanel, LoadingSkeleton } from "@/components/states";
 import { TranslatedBadge } from "@/components/Translation";
 import { api } from "@/lib/api/client";
-import type { ArticleListItem, Feed } from "@/lib/api/types";
+import type { ArticleListItem, Feed, FeedGroup } from "@/lib/api/types";
+import {
+  feedFilterQuery,
+  groupFeeds,
+  groupFilterValue,
+  parseFeedFilter,
+} from "@/lib/feed-groups";
 import { loadSessionState, saveSessionState } from "@/lib/session-state";
 
 const PER_PAGE = 20;
@@ -51,7 +57,8 @@ function parseFilter(raw: unknown): Filter | null {
     unreadOnly: r.unreadOnly,
     // 古い形式（markedOnly なし）の保存値は未指定扱い
     markedOnly: r.markedOnly === true,
-    feed: r.feed === "all" || /^\d+$/.test(r.feed) ? r.feed : "all",
+    // "all"・フィードID・グループ（"g:<id>"）
+    feed: parseFeedFilter(r.feed) ? r.feed : "all",
     period: r.period as Period,
     q: r.q,
   };
@@ -87,7 +94,7 @@ function truncate(s: string, n: number): string {
 // 期間は取得のたびに現在時刻から算出する
 function buildQuery(f: Filter) {
   return {
-    feed_id: f.feed === "all" ? undefined : Number(f.feed),
+    ...feedFilterQuery(f.feed),
     since:
       f.period === "all"
         ? undefined
@@ -121,6 +128,7 @@ export default function ArticlesPage() {
   const router = useRouter();
   const toast = useToast();
   const [feeds, setFeeds] = useState<Feed[] | null>(null);
+  const [feedGroups, setFeedGroups] = useState<FeedGroup[]>([]);
   // 記事を開いて戻ったときに条件を復元する（初回は保存済みの条件があればそれを使う）
   const [restored] = useState(() =>
     loadSessionState(FILTER_STORAGE_KEY, parseFilter),
@@ -153,16 +161,25 @@ export default function ArticlesPage() {
   }, [filter, qInput]);
 
   useEffect(() => {
-    api
-      .listFeeds()
-      .then((list) => {
+    Promise.all([
+      api.listFeeds(),
+      // グループが取得できなくてもフィード単位の絞り込みは使えるようにする
+      api.listFeedGroups().catch(() => null),
+    ])
+      .then(([list, groupList]) => {
         setFeeds(list);
-        // 削除済みのフィードが復元された場合は絞り込みを外す
-        setFilter((f) =>
-          f.feed === "all" || list.some((x) => String(x.id) === f.feed)
-            ? f
-            : { ...f, feed: "all" },
-        );
+        setFeedGroups(groupList ?? []);
+        // 削除済みのフィード・グループが復元された場合は絞り込みを外す
+        setFilter((f) => {
+          const v = parseFeedFilter(f.feed);
+          const exists =
+            v?.kind === "all" ||
+            (v?.kind === "feed" && list.some((x) => x.id === v.id)) ||
+            // グループ一覧を取得できなかったときは、保存済みのグループの絞り込みを残す
+            (v?.kind === "group" &&
+              (groupList === null || groupList.some((g) => g.id === v.id)));
+          return exists ? f : { ...f, feed: "all" };
+        });
       })
       .catch(() => setFeeds([]));
   }, []);
@@ -474,11 +491,31 @@ export default function ArticlesPage() {
               aria-label="フィードで絞り込み"
             >
               <option value="all">すべてのフィード</option>
-              {(feeds ?? []).map((f) => (
-                <option key={f.id} value={f.id}>
-                  {truncate(f.name, 24)}
-                </option>
-              ))}
+              {feedGroups.length === 0
+                ? (feeds ?? []).map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {truncate(f.name, 24)}
+                    </option>
+                  ))
+                : groupFeeds(feedGroups, feeds ?? []).map(
+                    ({ group, feeds: fs }) => (
+                      <optgroup
+                        key={group?.id ?? "none"}
+                        label={group ? group.name : "未分類"}
+                      >
+                        {group && (
+                          <option value={groupFilterValue(group.id)}>
+                            {group.name}（すべて）
+                          </option>
+                        )}
+                        {fs.map((f) => (
+                          <option key={f.id} value={f.id}>
+                            {truncate(f.name, 24)}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ),
+                  )}
             </select>
             <select
               className="art-select art-select-period"

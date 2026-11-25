@@ -13,6 +13,26 @@ export type Feed = {
   last_fetched_at: string | null;
   last_fetch_ok: boolean | null;
   last_fetch_error: string | null;
+  /** 所属グループ。null は未分類 */
+  group_id: number | null;
+};
+
+export type FeedGroup = {
+  id: number;
+  name: string;
+  position: number;
+  created_at: string;
+  feed_count: number;
+  enabled_count: number;
+  /** 有効なフィードのうち、最終取得が失敗したもの */
+  error_count: number;
+  unread_count: number;
+};
+
+/** グループ内の有効/無効を一括で変更した結果（変更したフィードのみ） */
+export type BulkEnabledResult = {
+  count: number;
+  feed_ids: number[];
 };
 
 export type FeedUnreadCount = {
@@ -125,6 +145,7 @@ export type ArticleQuery = {
   unread_only?: boolean;
   marked_only?: boolean;
   feed_id?: number;
+  group_id?: number;
   since?: string;
   q?: string;
   page?: number;

@@ -36,6 +36,7 @@ frontend（`frontend/` で実行。npm）:
 - 主なファイル（`project/` 配下。`Artifact` の `list` で実在を確認すること）:
   - `project/Deep Tracker.dc.html`: マスターのデザイン（約129KB。スタイル・状態ロジックもこの1ファイルに含まれる。`.logic.js` に分割された場合は**両方**を読むこと）
   - `project/feature/issue-126-translation.dc.html`: 記事の翻訳表示（#126）の作業用デザイン。マスターを複製して翻訳UIを追加したもの（マスターへのマージは未実施）
+  - `project/feature/issue-125-feed-group.dc.html`: 購読フィードのグループ（#125）の作業用デザイン。マスターを複製してグループUIを追加したもの（マスターへのマージは未実施）
   - `project/Deep Tracker Icons.dc.html`: アイコン
   - `project/support.js` / `project/compat.json`: 共通スクリプト・互換設定
   - `index.html`、`artifact-type/` と `SKILL.md` は Artifact の仕組み側のファイルでデザインではない。読まない。

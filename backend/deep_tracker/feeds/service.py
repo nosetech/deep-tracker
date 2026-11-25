@@ -60,6 +60,7 @@ def register_feed(
     *,
     client: httpx.Client | None = None,
     translation: TranslationSettings | None = None,
+    group_id: int | None = None,
 ) -> Feed:
     """URLを取得・解析できることを確認してから購読を登録し、初回の記事も保存する。
 
@@ -76,6 +77,7 @@ def register_feed(
         last_modified=result.last_modified,
         last_fetch_ok=True,
         last_fetched_at=now,
+        group_id=group_id,
     )
     session.add(feed)
     session.flush()

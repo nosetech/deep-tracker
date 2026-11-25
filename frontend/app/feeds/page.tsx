@@ -5,39 +5,40 @@ import { SHELL_REFRESH_EVENT } from "@/components/AppShell";
 import { useToast } from "@/components/Toast";
 import { ApiErrorPanel, LoadingSkeleton } from "@/components/states";
 import { ApiError, api } from "@/lib/api/client";
-import type { Feed } from "@/lib/api/types";
+import type { Feed, FeedGroup } from "@/lib/api/types";
 import { describeFeedError } from "@/lib/feed-error";
+import {
+  COLLAPSED_GROUPS_STORAGE_KEY,
+  groupFeeds,
+  parseCollapsedGroups,
+  sectionKey,
+  serializeCollapsedGroups,
+} from "@/lib/feed-groups";
+import { FeedGroupSection } from "./_components/FeedGroupSection";
+import { FeedRow, formatInterval } from "./_components/FeedRow";
 
 const INTERVAL_OPTIONS = [15, 30, 60, 180, 360, 720, 1440];
 
-function formatInterval(m: number): string {
-  return m < 60 ? `${m}分` : `${m / 60}時間`;
-}
+// グループの選択欄の値: "" は未分類、NEW_GROUP は新規作成、それ以外はグループID
+const NEW_GROUP = "__new";
 
-function formatShort(iso: string): string {
-  const d = new Date(iso);
-  const hm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  const now = new Date();
-  const dayKey = (x: Date) =>
-    x.getFullYear() * 10000 + x.getMonth() * 100 + x.getDate();
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  if (dayKey(d) === dayKey(now)) return `今日 ${hm}`;
-  if (dayKey(d) === dayKey(yesterday)) return `昨日 ${hm}`;
-  return `${d.getMonth() + 1}/${d.getDate()} ${hm}`;
-}
-
-function formatAgo(iso: string): string {
-  const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
-  if (m < 1) return "たった今";
-  if (m < 60) return `${m}分前`;
-  const h = Math.round(m / 60);
-  if (h < 24) return `${h}時間前`;
-  return `${Math.round(h / 24)}日前`;
-}
+const GROUP_FAILED =
+  "グループの操作に失敗しました。時間をおいて再試行してください。";
+const GROUP_NAME_EMPTY = "グループ名を入力してください。";
+const GROUP_NAME_DUPLICATE = "同じ名前のグループがすでにあります。";
+const GROUP_NOT_FOUND =
+  "選択したグループが見つかりません。画面を再読み込みしてください。";
 
 function refreshShell() {
   window.dispatchEvent(new Event(SHELL_REFRESH_EVENT));
+}
+
+/** グループ作成・名前変更のエラーを、入力欄の下に出す文言にする（該当しなければ null） */
+function groupNameError(err: unknown): string | null {
+  if (!(err instanceof ApiError)) return null;
+  if (err.code === "duplicate_name") return GROUP_NAME_DUPLICATE;
+  if (err.code === "invalid_name") return GROUP_NAME_EMPTY;
+  return null;
 }
 
 type Modal =
@@ -48,27 +49,78 @@ type Modal =
       name: string;
       url: string;
       interval: string;
+      group: string;
+      groupName: string;
       err: string;
       errCode?: string;
-    };
+      gnErr: string;
+    }
+  | { type: "group"; group: FeedGroup | null; name: string; err: string }
+  | { type: "groupDelete"; group: FeedGroup; count: number };
+
+type Section = { group: FeedGroup | null; feeds: Feed[] };
+
+function GroupSelect({
+  value,
+  groups,
+  onChange,
+  className,
+  ariaLabel,
+}: {
+  value: string;
+  groups: FeedGroup[];
+  onChange: (v: string) => void;
+  className?: string;
+  ariaLabel?: string;
+}) {
+  const sorted = groupFeeds(groups, []).flatMap((s) =>
+    s.group ? [s.group] : [],
+  );
+  return (
+    <select
+      className={className}
+      value={value}
+      aria-label={ariaLabel}
+      onChange={(e) => onChange(e.target.value)}
+    >
+      <option value="">未分類</option>
+      {sorted.map((g) => (
+        <option key={g.id} value={g.id}>
+          {g.name}
+        </option>
+      ))}
+      <option value={NEW_GROUP}>新しいグループを作成…</option>
+    </select>
+  );
+}
 
 export default function FeedsPage() {
   const toast = useToast();
   const [feeds, setFeeds] = useState<Feed[] | null>(null);
+  const [groups, setGroups] = useState<FeedGroup[]>([]);
   const [loadError, setLoadError] = useState(false);
   const [addUrl, setAddUrl] = useState("");
+  const [addGroup, setAddGroup] = useState("");
+  const [addGroupName, setAddGroupName] = useState("");
   const [addErr, setAddErr] = useState("");
   const [addErrCode, setAddErrCode] = useState("");
   const [addBusy, setAddBusy] = useState(false);
   const [fetching, setFetching] = useState<Set<number>>(new Set());
-  const [menu, setMenu] = useState<number | null>(null);
+  // フィードのメニューは "f:<id>"、グループ見出しのメニューは "g:<セクションのキー>"
+  const [menu, setMenu] = useState<string | null>(null);
   const [modal, setModal] = useState<Modal | null>(null);
   const [modalBusy, setModalBusy] = useState(false);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const load = useCallback(async () => {
     try {
-      setFeeds(await api.listFeeds());
+      const [fs, gs] = await Promise.all([
+        api.listFeeds(),
+        api.listFeedGroups(),
+      ]);
+      setFeeds(fs);
+      setGroups(gs);
       setLoadError(false);
     } catch {
       setLoadError(true);
@@ -76,9 +128,18 @@ export default function FeedsPage() {
   }, []);
 
   useEffect(() => {
-    // 初回表示時にAPIから取得する
+    // 初回表示時にAPIから取得し、折りたたみ状態をブラウザの保存値から復元する
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
+    try {
+      setCollapsed(
+        parseCollapsedGroups(
+          localStorage.getItem(COLLAPSED_GROUPS_STORAGE_KEY),
+        ),
+      );
+    } catch {
+      // ストレージが使えない場合はすべて展開
+    }
   }, [load]);
 
   // メニューの外側クリック・Escで閉じる
@@ -101,6 +162,44 @@ export default function FeedsPage() {
   const replaceFeed = (f: Feed) =>
     setFeeds((fs) => fs?.map((x) => (x.id === f.id ? f : x)) ?? fs);
 
+  const toggleCollapsed = (key: string) => {
+    setCollapsed((cur) => {
+      const next = new Set(cur);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      try {
+        localStorage.setItem(
+          COLLAPSED_GROUPS_STORAGE_KEY,
+          serializeCollapsedGroups(next),
+        );
+      } catch {
+        // 保存できなくても表示は切り替える
+      }
+      return next;
+    });
+  };
+
+  /** 「新しいグループを作成…」の名前を検証して作成する。失敗時はエラー文言を返す */
+  const createGroupFor = async (
+    name: string,
+  ): Promise<{ group: FeedGroup } | { error: string }> => {
+    if (!name) return { error: GROUP_NAME_EMPTY };
+    try {
+      return { group: await api.createFeedGroup(name) };
+    } catch (err) {
+      return { error: groupNameError(err) ?? GROUP_FAILED };
+    }
+  };
+
+  // 後続の操作が失敗したときに、作成したばかりのグループを取り消す
+  const discardGroup = async (g: FeedGroup) => {
+    try {
+      await api.deleteFeedGroup(g.id);
+    } catch {
+      // 残っても空のグループとして表示されるだけなので無視する
+    }
+  };
+
   const addFeed = async (e: React.FormEvent) => {
     e.preventDefault();
     const url = addUrl.trim();
@@ -108,27 +207,61 @@ export default function FeedsPage() {
       setAddErr("URLを入力してください。");
       return;
     }
+    const isNew = addGroup === NEW_GROUP;
+    if (isNew && !addGroupName.trim()) {
+      setAddErr(GROUP_NAME_EMPTY);
+      setAddErrCode("");
+      return;
+    }
     setAddBusy(true);
     setAddErr("");
     setAddErrCode("");
+    let created: FeedGroup | null = null;
     try {
-      const feed = await api.createFeed(url);
+      if (isNew) {
+        const res = await createGroupFor(addGroupName.trim());
+        if ("error" in res) {
+          setAddErr(res.error);
+          return;
+        }
+        created = res.group;
+      }
+      const groupId = created
+        ? created.id
+        : addGroup && groups.some((g) => String(g.id) === addGroup)
+          ? Number(addGroup)
+          : null;
+      const feed = await api.createFeed(url, groupId);
       setAddUrl("");
+      setAddGroupName("");
+      // 続けて同じグループに登録できるよう、選択中のグループは保持する
+      setAddGroup(groupId === null ? "" : String(groupId));
       setFeeds((fs) => [...(fs ?? []), feed]);
+      if (created) {
+        const g = created;
+        setGroups((gs) => [...gs, g]);
+      }
       // 登録時の初回取得結果を反映するため再取得する
       void load();
       refreshShell();
       toast(
-        `「${feed.name}」を追加しました。初回取得が完了しました（記事 ${feed.article_count}件）`,
+        `「${feed.name}」を追加しました${created ? `（グループ「${created.name}」を作成）` : ""}。初回取得が完了しました（記事 ${feed.article_count}件）`,
         "success",
       );
     } catch (err) {
+      // サーバが失敗を返した場合だけ取り消す（応答が失われただけなら登録済みの可能性がある）
+      if (created && err instanceof ApiError) void discardGroup(created);
       if (err instanceof ApiError && err.status === 422) {
-        const view = err.code === "invalid_url" ? null : describeFeedError(err);
+        const view =
+          err.code === "invalid_url" || err.code === "group_not_found"
+            ? null
+            : describeFeedError(err);
         setAddErr(
           err.code === "invalid_url"
             ? "URLの形式が正しくありません。http:// または https:// から始まるURLを入力してください。"
-            : (view?.message ??
+            : err.code === "group_not_found"
+              ? GROUP_NOT_FOUND
+              : (view?.message ??
                 "フィードを追加できませんでした。時間をおいて再度お試しください。"),
         );
         setAddErrCode(view?.code ?? "");
@@ -183,43 +316,143 @@ export default function FeedsPage() {
     }
   };
 
+  /** 一括既読の結果をトーストで知らせる（「元に戻す」付き） */
+  const afterBulkRead = async (
+    res: { count: number; article_ids: number[] },
+    label: string,
+  ) => {
+    if (res.count === 0) {
+      toast("未読の記事はありません");
+      return;
+    }
+    await load();
+    refreshShell();
+    toast(`${label} の ${res.count}件を既読にしました`, "success", {
+      label: "元に戻す",
+      onClick: async () => {
+        try {
+          await api.markUnread(res.article_ids);
+          await load();
+          refreshShell();
+          toast("既読を取り消しました");
+        } catch {
+          toast("既読を取り消せませんでした", "error");
+        }
+      },
+    });
+  };
+
   const readAll = async (f: Feed) => {
     setMenu(null);
     try {
-      const res = await api.markFeedRead(f.id);
-      if (res.count === 0) {
-        toast("未読の記事はありません");
-        return;
-      }
-      await load();
-      refreshShell();
-      toast(`${f.name} の ${res.count}件を既読にしました`, "success", {
-        label: "元に戻す",
-        onClick: async () => {
-          try {
-            await api.markUnread(res.article_ids);
-            await load();
-            refreshShell();
-            toast("既読を取り消しました");
-          } catch {
-            toast("既読を取り消せませんでした", "error");
-          }
-        },
-      });
+      await afterBulkRead(await api.markFeedRead(f.id), f.name);
     } catch {
       toast("既読にできませんでした", "error");
     }
   };
 
+  const groupReadAll = async (sec: Section) => {
+    setMenu(null);
+    try {
+      const res = await api.markFeedGroupRead(sec.group?.id ?? null);
+      await afterBulkRead(res, sec.group?.name ?? "未分類");
+    } catch {
+      toast(GROUP_FAILED, "error");
+    }
+  };
+
+  const groupSetEnabled = async (sec: Section, enabled: boolean) => {
+    setMenu(null);
+    const name = sec.group?.name ?? "未分類";
+    const label = enabled ? "有効" : "無効";
+    try {
+      const res = await api.setFeedGroupEnabled(sec.group?.id ?? null, enabled);
+      if (res.count === 0) {
+        toast(`${name} のフィードはすべて${label}です`);
+        return;
+      }
+      await load();
+      refreshShell();
+      toast(`${name} の ${res.count}件を${label}にしました`);
+    } catch {
+      toast(GROUP_FAILED, "error");
+    }
+  };
+
   const submitModal = async () => {
     if (!modal) return;
+    if (modal.type === "group") {
+      const name = modal.name.trim();
+      if (!name) {
+        setModal({ ...modal, err: GROUP_NAME_EMPTY });
+        return;
+      }
+      setModalBusy(true);
+      try {
+        if (modal.group) {
+          await api.renameFeedGroup(modal.group.id, name);
+          toast("グループ名を変更しました", "success");
+        } else {
+          await api.createFeedGroup(name);
+          toast(`グループ「${name}」を作成しました`, "success");
+        }
+        setModal(null);
+        await load();
+      } catch (err) {
+        const message = groupNameError(err);
+        if (message) setModal({ ...modal, err: message });
+        else toast(GROUP_FAILED, "error");
+      } finally {
+        setModalBusy(false);
+      }
+      return;
+    }
+    if (modal.type === "groupDelete") {
+      setModalBusy(true);
+      try {
+        await api.deleteFeedGroup(modal.group.id);
+        setModal(null);
+        const key = sectionKey(modal.group.id);
+        if (collapsed.has(key)) toggleCollapsed(key);
+        if (addGroup === String(modal.group.id)) setAddGroup("");
+        await load();
+        toast(`グループ「${modal.group.name}」を削除しました`, "success");
+      } catch {
+        toast(GROUP_FAILED, "error");
+      } finally {
+        setModalBusy(false);
+      }
+      return;
+    }
+    if (modal.type === "edit" && modal.group === NEW_GROUP) {
+      if (!modal.groupName.trim()) {
+        setModal({ ...modal, gnErr: GROUP_NAME_EMPTY });
+        return;
+      }
+    }
     setModalBusy(true);
+    let created: FeedGroup | null = null;
     try {
       if (modal.type === "delete") {
         await api.deleteFeed(modal.feed.id);
         setFeeds((fs) => fs?.filter((x) => x.id !== modal.feed.id) ?? fs);
         toast(`${modal.feed.name} を削除しました`, "success");
+        void load();
       } else {
+        if (modal.group === NEW_GROUP) {
+          const res = await createGroupFor(modal.groupName.trim());
+          if ("error" in res) {
+            if (res.error === GROUP_FAILED) toast(GROUP_FAILED, "error");
+            else setModal({ ...modal, gnErr: res.error });
+            return;
+          }
+          created = res.group;
+        }
+        const groupId = created
+          ? created.id
+          : modal.group
+            ? Number(modal.group)
+            : null;
         const updated = await api.updateFeed(modal.feed.id, {
           name: modal.name.trim() || modal.feed.name,
           fetch_interval_minutes: Number(modal.interval),
@@ -227,13 +460,25 @@ export default function FeedsPage() {
           ...(modal.url.trim() !== modal.feed.url
             ? { url: modal.url.trim() }
             : {}),
+          ...(groupId !== modal.feed.group_id ? { group_id: groupId } : {}),
         });
         replaceFeed(updated);
-        toast("フィードを更新しました", "success");
+        if (created) {
+          const g = created;
+          setGroups((gs) => [...gs, g]);
+        }
+        toast(
+          created
+            ? `フィードを更新しました（グループ「${created.name}」を作成）`
+            : "フィードを更新しました",
+          "success",
+        );
+        void load();
       }
       setModal(null);
       refreshShell();
     } catch (err) {
+      if (created && err instanceof ApiError) void discardGroup(created);
       if (modal.type === "edit" && err instanceof ApiError && err.code) {
         const view = describeFeedError(err);
         const message =
@@ -241,7 +486,9 @@ export default function FeedsPage() {
             ? "URLの形式が正しくありません。http:// または https:// から始まるURLを入力してください。"
             : err.code === "duplicate_url"
               ? "このフィードはすでに登録されています。"
-              : (view?.message ?? "");
+              : err.code === "group_not_found"
+                ? GROUP_NOT_FOUND
+                : (view?.message ?? "");
         if (message) {
           setModal({ ...modal, err: message, errCode: view?.code });
           return;
@@ -256,6 +503,67 @@ export default function FeedsPage() {
   const enabledCount = feeds?.filter((f) => f.enabled).length ?? 0;
   const errCount =
     feeds?.filter((f) => f.enabled && f.last_fetch_ok === false).length ?? 0;
+  const grouped = groups.length > 0;
+  const sections: Section[] = grouped ? groupFeeds(groups, feeds ?? []) : [];
+
+  const renderRow = (f: Feed) => {
+    const key = `f:${f.id}`;
+    return (
+      <FeedRow
+        key={f.id}
+        feed={f}
+        busy={fetching.has(f.id)}
+        menuOpen={menu === key}
+        menuRef={menuRef}
+        onToggleEnabled={() => void toggleEnabled(f)}
+        onFetch={() => void fetchNow(f)}
+        onToggleMenu={() => setMenu((m) => (m === key ? null : key))}
+        onEdit={() => {
+          setMenu(null);
+          setModal({
+            type: "edit",
+            feed: f,
+            name: f.name,
+            url: f.url,
+            interval: String(f.effective_fetch_interval_minutes),
+            group:
+              f.group_id !== null && groups.some((g) => g.id === f.group_id)
+                ? String(f.group_id)
+                : "",
+            groupName: "",
+            err: "",
+            gnErr: "",
+          });
+        }}
+        onReadAll={() => void readAll(f)}
+        onDelete={() => {
+          setMenu(null);
+          setModal({ type: "delete", feed: f });
+        }}
+      />
+    );
+  };
+
+  const modalTitle =
+    modal?.type === "delete"
+      ? "フィードを削除しますか？"
+      : modal?.type === "edit"
+        ? "フィードを編集"
+        : modal?.type === "groupDelete"
+          ? "グループを削除しますか？"
+          : modal?.group
+            ? "グループ名を変更"
+            : "グループを作成";
+  const isDanger = modal?.type === "delete" || modal?.type === "groupDelete";
+  const okLabel = isDanger
+    ? "削除する"
+    : modal?.type === "group"
+      ? modal.group
+        ? "保存"
+        : "作成"
+      : modalBusy
+        ? "検証中…"
+        : "保存";
 
   return (
     <div className="feeds-page">
@@ -281,10 +589,35 @@ export default function FeedsPage() {
               setAddErrCode("");
             }}
           />
+          <GroupSelect
+            className="feed-add-group"
+            ariaLabel="所属グループ"
+            value={addGroup}
+            groups={groups}
+            onChange={(v) => {
+              setAddGroup(v);
+              setAddErr("");
+              setAddErrCode("");
+            }}
+          />
           <button type="submit" className="btn-primary" disabled={addBusy}>
             {addBusy ? "検証中…" : "追加"}
           </button>
         </div>
+        {addGroup === NEW_GROUP && (
+          <label className="feed-add-newgroup">
+            新しいグループ名
+            <input
+              value={addGroupName}
+              placeholder="例: AWS障害情報"
+              onChange={(e) => {
+                setAddGroupName(e.target.value);
+                setAddErr("");
+                setAddErrCode("");
+              }}
+            />
+          </label>
+        )}
         {addErr && (
           <div role="alert" className="feed-add-err">
             <svg
@@ -321,6 +654,30 @@ export default function FeedsPage() {
             {errCount > 0 ? ` · エラー ${errCount}件` : ""}
           </span>
         )}
+        {feeds && (
+          <button
+            type="button"
+            className="btn-outline feed-group-create"
+            onClick={() => {
+              setMenu(null);
+              setModal({ type: "group", group: null, name: "", err: "" });
+            }}
+          >
+            <svg
+              aria-hidden="true"
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            グループを作成
+          </button>
+        )}
       </div>
 
       {loadError && <ApiErrorPanel onRetry={() => void load()} />}
@@ -335,169 +692,55 @@ export default function FeedsPage() {
         </div>
       )}
 
-      <div className="feed-list">
-        {feeds?.map((f) => {
-          const busy = fetching.has(f.id);
-          const hasError = f.enabled && f.last_fetch_ok === false && !busy;
-          const stColor = busy
-            ? "var(--ac)"
-            : !f.enabled
-              ? "var(--tx3)"
-              : f.last_fetch_ok === false
-                ? "var(--err)"
-                : f.last_fetch_ok
-                  ? "var(--ok)"
-                  : "var(--tx3)";
-          const status = busy
-            ? "取得中…"
-            : !f.enabled
-              ? "無効"
-              : f.last_fetch_ok === false
-                ? "エラー"
-                : f.last_fetch_ok
-                  ? "正常"
-                  : "未取得";
-          return (
-            <div
-              key={f.id}
-              className="feed-row"
-              style={{ opacity: f.enabled ? 1 : 0.62 }}
-            >
-              <div className="feed-main">
-                <div className="feed-name">{f.name}</div>
-                <div className="feed-url" title={f.url}>
-                  {f.url}
-                </div>
-                {hasError && f.last_fetch_error && (
-                  <div className="feed-error">{f.last_fetch_error}</div>
-                )}
-              </div>
-              <div className="feed-status">
-                <span className="feed-status-label" style={{ color: stColor }}>
-                  <span
-                    className="feed-status-dot"
-                    style={{ background: stColor }}
-                  />
-                  {status}
-                </span>
-                <span className="feed-sub">
-                  最終取得{" "}
-                  {f.last_fetched_at
-                    ? `${formatShort(f.last_fetched_at)}（${formatAgo(f.last_fetched_at)}）`
-                    : "—"}
-                </span>
-              </div>
-              <div className="feed-counts">
-                <span>
-                  記事 {f.article_count.toLocaleString("ja-JP")}件 · 未読{" "}
-                  <strong
-                    style={{
-                      color: f.unread_count ? "var(--ac)" : "var(--tx2)",
-                      fontWeight: 600,
-                    }}
-                  >
-                    {f.unread_count}
-                  </strong>
-                </span>
-                <span className="feed-sub">
-                  取得間隔 {formatInterval(f.effective_fetch_interval_minutes)}
-                </span>
-              </div>
-              <div
-                className="feed-actions"
-                ref={menu === f.id ? menuRef : undefined}
+      {feeds && !grouped && (
+        <div className="feed-list">{feeds.map(renderRow)}</div>
+      )}
+
+      {feeds && grouped && (
+        <div className="feed-groups">
+          {sections.map((sec) => {
+            const key = sectionKey(sec.group?.id ?? null);
+            const menuKey = `g:${key}`;
+            return (
+              <FeedGroupSection
+                key={key}
+                group={sec.group}
+                feeds={sec.feeds}
+                expanded={!collapsed.has(key)}
+                menuOpen={menu === menuKey}
+                menuRef={menuRef}
+                onToggleExpanded={() => toggleCollapsed(key)}
+                onToggleMenu={() =>
+                  setMenu((m) => (m === menuKey ? null : menuKey))
+                }
+                onRename={() => {
+                  setMenu(null);
+                  if (sec.group)
+                    setModal({
+                      type: "group",
+                      group: sec.group,
+                      name: sec.group.name,
+                      err: "",
+                    });
+                }}
+                onSetEnabled={(enabled) => void groupSetEnabled(sec, enabled)}
+                onReadAll={() => void groupReadAll(sec)}
+                onDelete={() => {
+                  setMenu(null);
+                  if (sec.group)
+                    setModal({
+                      type: "groupDelete",
+                      group: sec.group,
+                      count: sec.feeds.length,
+                    });
+                }}
               >
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={f.enabled}
-                  aria-label="有効/無効"
-                  title={
-                    f.enabled
-                      ? "有効（クリックで無効化）"
-                      : "無効（クリックで有効化）"
-                  }
-                  className="switch"
-                  style={{ background: f.enabled ? "var(--ok)" : "var(--off)" }}
-                  onClick={() => void toggleEnabled(f)}
-                >
-                  <span
-                    className="switch-knob"
-                    style={{ left: f.enabled ? 19 : 3 }}
-                  />
-                </button>
-                <button
-                  type="button"
-                  className="btn-outline btn-sm"
-                  disabled={busy || !f.enabled}
-                  onClick={() => void fetchNow(f)}
-                >
-                  {busy ? "取得中…" : "今すぐ取得"}
-                </button>
-                <button
-                  type="button"
-                  className="btn-outline btn-icon"
-                  aria-label="その他の操作"
-                  aria-expanded={menu === f.id}
-                  onClick={() => setMenu((m) => (m === f.id ? null : f.id))}
-                >
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    aria-hidden="true"
-                  >
-                    <circle cx="5" cy="12" r="1.7" />
-                    <circle cx="12" cy="12" r="1.7" />
-                    <circle cx="19" cy="12" r="1.7" />
-                  </svg>
-                </button>
-                {menu === f.id && (
-                  <div role="menu" className="feed-menu">
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        setMenu(null);
-                        setModal({
-                          type: "edit",
-                          feed: f,
-                          name: f.name,
-                          url: f.url,
-                          interval: String(f.effective_fetch_interval_minutes),
-                          err: "",
-                        });
-                      }}
-                    >
-                      名称・URL・取得間隔を編集
-                    </button>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => void readAll(f)}
-                    >
-                      このフィードをすべて既読にする
-                    </button>
-                    <div className="feed-menu-sep" />
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="is-danger"
-                      onClick={() => {
-                        setMenu(null);
-                        setModal({ type: "delete", feed: f });
-                      }}
-                    >
-                      削除…
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+                {sec.feeds.map(renderRow)}
+              </FeedGroupSection>
+            );
+          })}
+        </div>
+      )}
 
       {modal && (
         <div
@@ -512,18 +755,46 @@ export default function FeedsPage() {
             aria-labelledby="dt-modal-t"
             className="modal"
           >
-            <h2 id="dt-modal-t">
-              {modal.type === "delete"
-                ? "フィードを削除しますか？"
-                : "フィードを編集"}
-            </h2>
-            {modal.type === "delete" ? (
+            <h2 id="dt-modal-t">{modalTitle}</h2>
+            {modal.type === "delete" && (
               <p className="modal-text">
                 「{modal.feed.name}」と、このフィードの記事{" "}
                 {modal.feed.article_count.toLocaleString("ja-JP")}
                 件を削除します。この操作は取り消せません。
               </p>
-            ) : (
+            )}
+            {modal.type === "groupDelete" && (
+              <p className="modal-text">
+                グループ「{modal.group.name}」を削除します。所属するフィード{" "}
+                {modal.count}件は削除されず「未分類」に移動します。
+              </p>
+            )}
+            {modal.type === "group" && (
+              <div className="modal-form">
+                <div className="modal-field">
+                  <label>
+                    グループ名
+                    <input
+                      value={modal.name}
+                      placeholder="例: AWS障害情報"
+                      aria-invalid={modal.err ? true : undefined}
+                      style={{
+                        borderColor: modal.err ? "var(--err)" : undefined,
+                      }}
+                      onChange={(e) =>
+                        setModal({ ...modal, name: e.target.value, err: "" })
+                      }
+                    />
+                  </label>
+                  {modal.err && (
+                    <div role="alert" className="modal-field-err">
+                      <span>{modal.err}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            {modal.type === "edit" && (
               <div className="modal-form">
                 <label>
                   名称
@@ -584,6 +855,42 @@ export default function FeedsPage() {
                     ))}
                   </select>
                 </label>
+                <label>
+                  グループ
+                  <GroupSelect
+                    value={modal.group}
+                    groups={groups}
+                    onChange={(v) =>
+                      setModal({ ...modal, group: v, gnErr: "" })
+                    }
+                  />
+                </label>
+                {modal.group === NEW_GROUP && (
+                  <div className="modal-field">
+                    <label>
+                      新しいグループ名
+                      <input
+                        value={modal.groupName}
+                        aria-invalid={modal.gnErr ? true : undefined}
+                        style={{
+                          borderColor: modal.gnErr ? "var(--err)" : undefined,
+                        }}
+                        onChange={(e) =>
+                          setModal({
+                            ...modal,
+                            groupName: e.target.value,
+                            gnErr: "",
+                          })
+                        }
+                      />
+                    </label>
+                    {modal.gnErr && (
+                      <div role="alert" className="modal-field-err">
+                        <span>{modal.gnErr}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
             <div className="modal-actions">
@@ -599,18 +906,13 @@ export default function FeedsPage() {
                 type="button"
                 className="btn-ok"
                 style={{
-                  background:
-                    modal.type === "delete" ? "var(--err)" : "var(--ac)",
-                  color: modal.type === "delete" ? "#fff" : "var(--onAc)",
+                  background: isDanger ? "var(--err)" : "var(--ac)",
+                  color: isDanger ? "#fff" : "var(--onAc)",
                 }}
                 disabled={modalBusy}
                 onClick={() => void submitModal()}
               >
-                {modal.type === "delete"
-                  ? "削除する"
-                  : modalBusy
-                    ? "検証中…"
-                    : "保存"}
+                {okLabel}
               </button>
             </div>
           </div>
