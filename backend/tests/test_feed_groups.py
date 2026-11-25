@@ -107,6 +107,8 @@ def test_duplicate_and_invalid_name(client, data):
     # 英字の大文字・小文字は区別しない
     res = client.post("/api/feed-groups", json={"name": "BLOG"})
     assert res.status_code == 409
+    client.post("/api/feed-groups", json={"name": "Ｗｅｂ"})
+    assert client.post("/api/feed-groups", json={"name": "ｗｅｂ"}).status_code == 409
 
     res = client.post("/api/feed-groups", json={"name": "   "})
     assert res.status_code == 422
@@ -242,14 +244,40 @@ def test_migration_keeps_existing_feeds_ungrouped(tmp_path):
                     " VALUES (1, 'f', 'https://e.example/rss', 1, '2026-01-01')"
                 )
             )
+            conn.execute(
+                text(
+                    "INSERT INTO articles (id, feed_id, guid, title, fetched_at, is_read,"
+                    " is_marked, translation_truncated)"
+                    " VALUES (1, 1, 'g', 't', '2026-01-01', 0, 1, 0)"
+                )
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO summaries (id, period_start, period_end, created_at, status)"
+                    " VALUES (1, '2026-01-01', '2026-01-08', '2026-01-08', 'succeeded')"
+                )
+            )
+            conn.execute(text("INSERT INTO summary_articles VALUES (1, 1)"))
+
+        def counts() -> tuple[int, int, int]:
+            with eng.connect() as conn:
+                return tuple(
+                    conn.execute(text(f"SELECT count(*) FROM {t}")).scalar()
+                    for t in ("feeds", "articles", "summary_articles")
+                )
+
+        # feeds を作り直しても、外部キーの CASCADE で記事・サマリの関連が消えないこと
         command.upgrade(cfg, "0005")
+        assert counts() == (1, 1, 1)
         with make_session_factory(eng)() as s:
             assert s.scalar(select(Feed.group_id).where(Feed.id == 1)) is None
             assert s.scalars(select(FeedGroup)).all() == []
         command.downgrade(cfg, "0004")
+        assert counts() == (1, 1, 1)
         assert "feed_groups" not in inspect(eng).get_table_names()
         assert "group_id" not in {c["name"] for c in inspect(eng).get_columns("feeds")}
+        # マイグレーション後もアプリの接続では外部キーが有効
         with eng.connect() as conn:
-            assert conn.execute(text("SELECT count(*) FROM feeds")).scalar() == 1
+            assert conn.exec_driver_sql("PRAGMA foreign_keys").scalar() == 1
     finally:
         eng.dispose()

@@ -328,3 +328,27 @@ def test_add_with_unknown_group(client, factory):
     # 取得・登録はしない
     with factory() as s:
         assert s.scalar(select(func.count()).select_from(Feed)) == 0
+
+
+def test_add_with_group_fetch_failure_registers_nothing(client, handler, factory):
+    group = client.post("/api/feed-groups", json={"name": "AWS"}).json()
+    handler.fn = staticmethod(lambda req: httpx.Response(500))
+    res = add(client, group_id=group["id"])
+    assert res.status_code == 422
+    with factory() as s:
+        assert s.scalar(select(func.count()).select_from(Feed)) == 0
+    assert client.get("/api/feed-groups").json()[0]["feed_count"] == 0
+
+
+def test_update_group_not_applied_when_url_change_fails(client, handler):
+    feed = add(client).json()
+    group = client.post("/api/feed-groups", json={"name": "AWS"}).json()
+    handler.fn = staticmethod(lambda req: httpx.Response(500))
+    res = client.patch(
+        f"/api/feeds/{feed['id']}",
+        json={"url": "https://other.example/rss", "group_id": group["id"]},
+    )
+    assert res.status_code == 422
+    feeds = client.get("/api/feeds").json()
+    assert feeds[0]["group_id"] is None
+    assert feeds[0]["url"] == AWS_URL

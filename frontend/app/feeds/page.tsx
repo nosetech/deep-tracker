@@ -26,6 +26,8 @@ const GROUP_FAILED =
   "グループの操作に失敗しました。時間をおいて再試行してください。";
 const GROUP_NAME_EMPTY = "グループ名を入力してください。";
 const GROUP_NAME_DUPLICATE = "同じ名前のグループがすでにあります。";
+const GROUP_NOT_FOUND =
+  "選択したグループが見つかりません。画面を再読み込みしてください。";
 
 function refreshShell() {
   window.dispatchEvent(new Event(SHELL_REFRESH_EVENT));
@@ -247,7 +249,8 @@ export default function FeedsPage() {
         "success",
       );
     } catch (err) {
-      if (created) void discardGroup(created);
+      // サーバが失敗を返した場合だけ取り消す（応答が失われただけなら登録済みの可能性がある）
+      if (created && err instanceof ApiError) void discardGroup(created);
       if (err instanceof ApiError && err.status === 422) {
         const view =
           err.code === "invalid_url" || err.code === "group_not_found"
@@ -257,7 +260,7 @@ export default function FeedsPage() {
           err.code === "invalid_url"
             ? "URLの形式が正しくありません。http:// または https:// から始まるURLを入力してください。"
             : err.code === "group_not_found"
-              ? "選択したグループが見つかりません。画面を再読み込みしてください。"
+              ? GROUP_NOT_FOUND
               : (view?.message ??
                 "フィードを追加できませんでした。時間をおいて再度お試しください。"),
         );
@@ -475,7 +478,7 @@ export default function FeedsPage() {
       setModal(null);
       refreshShell();
     } catch (err) {
-      if (created) void discardGroup(created);
+      if (created && err instanceof ApiError) void discardGroup(created);
       if (modal.type === "edit" && err instanceof ApiError && err.code) {
         const view = describeFeedError(err);
         const message =
@@ -483,7 +486,9 @@ export default function FeedsPage() {
             ? "URLの形式が正しくありません。http:// または https:// から始まるURLを入力してください。"
             : err.code === "duplicate_url"
               ? "このフィードはすでに登録されています。"
-              : (view?.message ?? "");
+              : err.code === "group_not_found"
+                ? GROUP_NOT_FOUND
+                : (view?.message ?? "");
         if (message) {
           setModal({ ...modal, err: message, errCode: view?.code });
           return;

@@ -72,11 +72,15 @@ def _duplicate() -> HTTPException:
 
 
 def _name_taken(session: Session, name: str, exclude_id: int | None = None) -> bool:
-    """同じ名前のグループがあるか。英字の大文字・小文字は区別しない。"""
-    stmt = select(FeedGroup.id).where(func.lower(FeedGroup.name) == name.lower())
-    if exclude_id is not None:
-        stmt = stmt.where(FeedGroup.id != exclude_id)
-    return session.scalar(stmt.limit(1)) is not None
+    """同じ名前のグループがあるか。英字の大文字・小文字（全角を含む）は区別しない。
+
+    SQLite の lower() は ASCII しか扱わないため、件数の少ないグループ名を読み出して比較する。
+    """
+    key = name.casefold()
+    return any(
+        gid != exclude_id and other.casefold() == key
+        for gid, other in session.execute(select(FeedGroup.id, FeedGroup.name))
+    )
 
 
 def _group_outs(session: Session, group_ids: list[int] | None = None) -> list[FeedGroupOut]:

@@ -175,8 +175,9 @@ export default function ArticlesPage() {
           const exists =
             v?.kind === "all" ||
             (v?.kind === "feed" && list.some((x) => x.id === v.id)) ||
+            // グループ一覧を取得できなかったときは、保存済みのグループの絞り込みを残す
             (v?.kind === "group" &&
-              (groupList ?? []).some((g) => g.id === v.id));
+              (groupList === null || groupList.some((g) => g.id === v.id)));
           return exists ? f : { ...f, feed: "all" };
         });
       })

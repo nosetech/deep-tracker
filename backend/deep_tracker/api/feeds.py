@@ -190,7 +190,12 @@ def create_feed(
     group_id = _validate_group(session, body.group_id)
     try:
         feed = register_feed(
-            session, url, name or None, client=client, translation=get_settings().translation
+            session,
+            url,
+            name or None,
+            client=client,
+            translation=get_settings().translation,
+            group_id=group_id,
         )
     except IntegrityError:
         # 重複チェックと登録の間に同じURLが登録された場合
@@ -200,9 +205,6 @@ def create_feed(
         raise _fetch_failed(exc) from exc
     except FeedParseError as exc:
         raise _error(422, ERROR_NOT_A_FEED, describe_error(exc)) from exc
-    if group_id is not None:
-        feed.group_id = group_id
-        session.commit()
     _wake_ai_runner(request)
     return _feed_out(session, feed)
 
