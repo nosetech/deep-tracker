@@ -72,10 +72,11 @@ jobs:
         run: npm run build
         env:
           NODE_ENV: production # NODE_ENV非標準値によるビルド失敗を防ぐ
+          NEXT_OUTPUT: standalone
       - name: assemble standalone package
         run: |
           if [ ! -f .next/standalone/server.js ]; then
-            echo "::error::next.config.tsにoutput: \"standalone\"が設定されていません"
+            echo "::error::standalone出力が生成されていません（next.config.tsのNEXT_OUTPUT=standalone）"
             exit 1
           fi
           mkdir -p pkg/frontend/.next
