@@ -36,6 +36,7 @@ cp config/config.yaml.example config/config.yaml
 | `summary.interval` | サマリの周期（`daily` / `weekly` / `monthly`） |
 | `slack.enabled` / `slack.webhook_url` | Slack通知（無効でも動作します） |
 | `ai.command` | Claude Code CLI の絶対パス（`which claude`）。launchd 経由では PATH が限られるため推奨 |
+| `translation.enabled` / `translation.max_per_fetch` | 日本語以外の新着記事を取得時にAIで日本語へ自動翻訳するか（既定 `true`）と、1回の取得で自動翻訳する件数の上限（既定20）。`false` でも記事詳細の「日本語に翻訳」から手動で翻訳できます |
 
 ### 画面の公開先IP（`.env`）
 
