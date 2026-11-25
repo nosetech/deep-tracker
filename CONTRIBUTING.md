@@ -87,7 +87,7 @@ npm run build
 
 ## 配布物（dist/）とリリース
 
-リリースは GitHub Releases の tarball（`deep-tracker-<version>.tar.gz` と `.sha256`）で配布する。`v*.*.*` タグの push で `.github/workflows/release.yml` が、バージョン一致の検証 → backend / frontend の lint・テスト・ビルド → tarball 作成 → Release 公開まで行う。frontend は Next.js の standalone 出力をビルド済みで同梱し、利用者側の npm / ビルドは不要。
+リリースは GitHub Releases の tarball（`deep-tracker-<version>.tar.gz` と `.sha256`）で配布する。`v*.*.*` タグの push で `.github/workflows/release.yml` が、バージョン一致の検証 → backend / frontend の lint・テスト・ビルド → tarball 作成 → Release 公開まで行う。frontend は Next.js の standalone 出力をビルド済みで同梱し、利用者側の npm / ビルドは不要。standalone 出力は環境変数 `NEXT_OUTPUT=standalone` のときだけ有効になる（`release.yml` が指定。通常のビルドで有効にすると `next start` が警告するため）。
 
 ### dist/ と開発用ファイルの対応
 

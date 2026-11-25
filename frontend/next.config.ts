@@ -10,11 +10,16 @@ const allowedDevOrigins = (process.env.ALLOWED_DEV_ORIGINS ?? "")
   .filter(Boolean);
 
 // 動作確認用インスタンス（scripts/dev-instance.sh）は、運用のビルド成果物を壊さないよう別ディレクトリを使う
-// 配布物は standalone 出力（node server.js で起動。利用者側で npm / ビルドは不要）
+// 配布物は standalone 出力（node server.js で起動。利用者側で npm / ビルドは不要）。
+// リリースのビルド（release.yml）だけ NEXT_OUTPUT=standalone で有効にする。通常のビルドで有効にすると、
+// ソースのチェックアウトを起動する next start が「standalone では動かない」と警告するため
 const nextConfig: NextConfig = {
-  output: "standalone",
+  output: process.env.NEXT_OUTPUT === "standalone" ? "standalone" : undefined,
   allowedDevOrigins,
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
+  experimental: {
+    agentUpgrade: "security",
+  },
 };
 
 export default nextConfig;
