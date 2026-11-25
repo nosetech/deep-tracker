@@ -129,12 +129,12 @@ export default function ArticlesPage() {
   const toast = useToast();
   const [feeds, setFeeds] = useState<Feed[] | null>(null);
   const [feedGroups, setFeedGroups] = useState<FeedGroup[]>([]);
-  // 記事を開いて戻ったときに条件を復元する（初回は保存済みの条件があればそれを使う）
-  const [restored] = useState(() =>
-    loadSessionState(FILTER_STORAGE_KEY, parseFilter),
-  );
-  const [filter, setFilter] = useState<Filter>(restored ?? INITIAL_FILTER);
-  const [qInput, setQInput] = useState(restored?.q ?? "");
+  // 初回描画は SSR と一致させるため初期条件で描画し、保存済みの条件はマウント後に復元する
+  // （描画中に sessionStorage を読むと hydration mismatch になり、<html> の data-theme 等が消える）
+  const [filter, setFilter] = useState<Filter>(INITIAL_FILTER);
+  const [qInput, setQInput] = useState("");
+  // 復元が済むまでは記事の取得・条件の保存をしない（初期条件での余計な取得・保存値の上書きを防ぐ）
+  const [restored, setRestored] = useState(false);
   const [items, setItems] = useState<ArticleListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [unreadTotal, setUnreadTotal] = useState(0);
@@ -145,6 +145,17 @@ export default function ArticlesPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   // 絞り込み変更・再取得で古いレスポンスを捨てるための世代
   const generation = useRef(0);
+
+  // 記事を開いて戻ったときに条件を復元する（保存済みの条件があればそれを使う）
+  useEffect(() => {
+    const saved = loadSessionState(FILTER_STORAGE_KEY, parseFilter);
+    if (saved) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFilter(saved);
+      setQInput(saved.q);
+    }
+    setRestored(true);
+  }, []);
 
   // 検索語はデバウンスして絞り込みに反映
   useEffect(() => {
@@ -157,8 +168,9 @@ export default function ArticlesPage() {
   }, [qInput]);
 
   useEffect(() => {
+    if (!restored) return;
     saveSessionState(FILTER_STORAGE_KEY, { ...filter, q: qInput });
-  }, [filter, qInput]);
+  }, [filter, qInput, restored]);
 
   useEffect(() => {
     Promise.all([
@@ -214,9 +226,10 @@ export default function ArticlesPage() {
   }, [filter]);
 
   useEffect(() => {
+    if (!restored) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
-  }, [load]);
+  }, [load, restored]);
 
   // 未読のみ表示中は既読にした記事を、マーク済みのみ表示中はマークを外した記事を一覧から外す
   const filtered = filter.unreadOnly || filter.markedOnly;
