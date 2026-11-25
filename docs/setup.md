@@ -14,10 +14,12 @@ cd backend && uv sync && cd ..
 (cd frontend && npm install)
 scripts/start.sh               # backend と frontend をバックグラウンドで起動
 scripts/stop.sh                # 両方を停止（未起動でもエラーにならない）
+scripts/backend_start.sh       # backend だけ起動（frontend_start.sh / backend_stop.sh / frontend_stop.sh も同様）
 ```
 
 - `scripts/start.sh` は frontend が未ビルドなら自動で `npm run build` する。`/api/*` の中継先（`BACKEND_URL`）は実行時に読まれるため、`backend.port` を変えてもビルドし直しは不要開発サーバで起動するには `FRONTEND_MODE=dev scripts/start.sh`
 - PID は `logs/deep-tracker.<instance>.{backend,frontend}.pid`、ログは `logs/{backend,backend.stderr,frontend}.log` に出る（[ログ](#6-ログ)の日次ローテーションを参照）。`instance` ごとにPIDが分かれるため、展開先を分ければ並行稼働できる
+- `scripts/start.sh` / `stop.sh` は `{backend,frontend}_{start,stop}.sh` を順に呼ぶ（start は backend → frontend、stop は frontend → backend）。PID・ログ・環境変数（`FRONTEND_MODE` / `LAN_IP` / `TAILSCALE_IP`）は一括と個別で共通のため、片方だけの再起動や、一括起動→個別停止の混在ができる。プロセス単位で管理するツールへは個別スクリプトを登録する。launchd 登録中は個別 start も拒否される
 - 二重起動は拒否される。異常終了でPIDファイルが残っていても、次の `scripts/start.sh` は起動できる
 
 | 設定 | 動作 |
@@ -197,9 +199,23 @@ scripts/summary-job.sh install
 
 ログは `logs/summary.log`（日次ローテーション。「6. ログ」参照）。launchd が受け取った出力は `logs/summary.launchd.log`。
 
+# 記事の翻訳
+
+日本語以外の記事は、取得時にAIでタイトルと本文を日本語に翻訳する（AIジョブ `translate_article`。バックエンドが処理する）。設定は `config/config.yaml` の `translation`（変更はアプリの再起動で反映）。
+
+| 項目 | 既定 | 説明 |
+|---|---|---|
+| `translation.enabled` | `true` | 取得時に日本語以外の新着記事を自動で翻訳ジョブに投入するか。`false` でも記事詳細の「日本語に翻訳」から手動で翻訳できる |
+| `translation.max_per_fetch` | `20` | 1回の取得（1フィード）で自動投入する件数の上限（新しい順）。超過分は未翻訳のまま残り、手動で翻訳できる |
+
+- 定期取得バッチ（launchd）が投入したジョブも、起動中のバックエンドが処理する。バックエンドが停止中は待機したまま残り、起動後に処理される
+- 利用制限などで失敗しても自動リトライはしない。記事は原文のまま表示され、画面から再試行できる
+- AIの利用制限に達した場合は、キューに残っているAIジョブ（翻訳と、画面の「今すぐサマリを生成」）も実行せずに止める（画面では利用制限として表示され、解除後に再試行できる）。定期サマリのバッチはキューを使わないため対象外
+- 本文が長い記事（20,000文字超）は先頭のみ翻訳する
+
 # DBバックアップ
 
-DB（`db.path`）には記事・サマリ・既読状態・フィード購読・フィードバック履歴がすべて入っており、失うと復元できない。毎日3:00に自動バックアップする。
+DB（`db.path`）には記事・サマリ・既読状態・フィード購読・フィードバック履歴がすべて入っており、失うと復元できない。毎日3:00（既定。`install HH:MM` で変更可）に自動バックアップする。
 
 ## 1. 設定
 
@@ -220,7 +236,7 @@ backup:
 scripts/backup-job.sh install
 ```
 
-- ジョブ名は `com.nosetech.deep-tracker.<instance>.backup`（instance ごとに別ジョブ）。毎日3:00に実行する
+- ジョブ名は `com.nosetech.deep-tracker.<instance>.backup`（instance ごとに別ジョブ）。既定は毎日3:00に実行する（`install HH:MM` で変更可）
 - 操作（`uninstall` / `start` / `stop` / `status` / `run`）は `scripts/fetch-job.sh` と同じ。今すぐ取るなら `scripts/backup-job.sh start`（または `run`）
 
 ## 3. 動作

@@ -3,7 +3,7 @@ from typing import Annotated
 from urllib.parse import urlparse
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from deep_tracker.api.deps import get_http_client, get_session
 from deep_tracker.config import get_settings
-from deep_tracker.db import Article, Feed
+from deep_tracker.db import Article, Feed, FeedGroup
 from deep_tracker.feeds import (
     FeedParseError,
     change_feed_url,
@@ -31,6 +31,7 @@ ERROR_DUPLICATE_URL = "duplicate_url"
 ERROR_FETCH_FAILED = "fetch_failed"
 ERROR_NOT_A_FEED = "not_a_feed"
 ERROR_NOT_FOUND = "feed_not_found"
+ERROR_GROUP_NOT_FOUND = "group_not_found"
 
 
 class FeedOut(BaseModel):
@@ -48,12 +49,16 @@ class FeedOut(BaseModel):
     # 未取得は None
     last_fetch_ok: bool | None
     last_fetch_error: str | None
+    # 所属グループ。None は未分類
+    group_id: int | None
 
 
 class FeedCreate(BaseModel):
     url: str
     # 省略時はフィードのタイトルを使う
     name: str | None = Field(default=None, max_length=255)
+    # 所属グループ。省略・null は未分類
+    group_id: int | None = None
 
 
 class FeedUpdate(BaseModel):
@@ -64,6 +69,8 @@ class FeedUpdate(BaseModel):
     enabled: bool | None = None
     # 変更時は新URLを取得・解析できることを確認してから付け替える
     url: str | None = None
+    # null を送ると未分類にする
+    group_id: int | None = None
 
 
 class FetchOut(BaseModel):
@@ -129,7 +136,21 @@ def _build_out(feed: Feed, article_count: int, unread_count: int) -> FeedOut:
         last_fetched_at=feed.last_fetched_at,
         last_fetch_ok=feed.last_fetch_ok,
         last_fetch_error=feed.last_fetch_error,
+        group_id=feed.group_id,
     )
+
+
+def _wake_ai_runner(request: Request) -> None:
+    """取得で翻訳ジョブを投入した場合に備え、AIジョブの実行を起こす。"""
+    runner = getattr(request.app.state, "ai_runner", None)
+    if runner is not None:
+        runner.notify()
+
+
+def _validate_group(session: Session, group_id: int | None) -> int | None:
+    if group_id is not None and session.get(FeedGroup, group_id) is None:
+        raise _error(422, ERROR_GROUP_NOT_FOUND, "指定したグループが見つかりません")
+    return group_id
 
 
 def _get_feed(session: Session, feed_id: int) -> Feed:
@@ -159,13 +180,23 @@ def list_feeds(session: SessionDep) -> list[FeedOut]:
 
 
 @router.post("", response_model=FeedOut, status_code=201)
-def create_feed(body: FeedCreate, session: SessionDep, client: ClientDep) -> FeedOut:
+def create_feed(
+    body: FeedCreate, request: Request, session: SessionDep, client: ClientDep
+) -> FeedOut:
     url = _validate_url(body.url)
     if session.scalar(select(Feed.id).where(Feed.url == url)) is not None:
         raise _error(409, ERROR_DUPLICATE_URL, "このフィードは既に登録されています")
     name = body.name.strip() if body.name else None
+    group_id = _validate_group(session, body.group_id)
     try:
-        feed = register_feed(session, url, name or None, client=client)
+        feed = register_feed(
+            session,
+            url,
+            name or None,
+            client=client,
+            translation=get_settings().translation,
+            group_id=group_id,
+        )
     except IntegrityError:
         # 重複チェックと登録の間に同じURLが登録された場合
         session.rollback()
@@ -174,22 +205,29 @@ def create_feed(body: FeedCreate, session: SessionDep, client: ClientDep) -> Fee
         raise _fetch_failed(exc) from exc
     except FeedParseError as exc:
         raise _error(422, ERROR_NOT_A_FEED, describe_error(exc)) from exc
+    _wake_ai_runner(request)
     return _feed_out(session, feed)
 
 
 @router.patch("/{feed_id}", response_model=FeedOut)
-def update_feed(feed_id: int, body: FeedUpdate, session: SessionDep, client: ClientDep) -> FeedOut:
+def update_feed(
+    feed_id: int, body: FeedUpdate, request: Request, session: SessionDep, client: ClientDep
+) -> FeedOut:
     feed = _get_feed(session, feed_id)
     sent = body.model_fields_set
     new_url = _validate_url(body.url) if "url" in sent and body.url is not None else None
     if "name" in sent and not (body.name or "").strip():
         raise _error(422, "invalid_name", "名称を空にはできません")
+    if "group_id" in sent:
+        _validate_group(session, body.group_id)
     if new_url is not None and new_url != feed.url:
         other = session.scalar(select(Feed.id).where(Feed.url == new_url, Feed.id != feed.id))
         if other is not None:
             raise _error(409, ERROR_DUPLICATE_URL, "このフィードは既に登録されています")
         try:
-            change_feed_url(session, feed, new_url, client=client)
+            change_feed_url(
+                session, feed, new_url, client=client, translation=get_settings().translation
+            )
         except IntegrityError:
             session.rollback()
             raise _error(409, ERROR_DUPLICATE_URL, "このフィードは既に登録されています") from None
@@ -199,12 +237,15 @@ def update_feed(feed_id: int, body: FeedUpdate, session: SessionDep, client: Cli
         except FeedParseError as exc:
             session.rollback()
             raise _error(422, ERROR_NOT_A_FEED, describe_error(exc)) from exc
+        _wake_ai_runner(request)
     if "name" in sent:
         feed.name = (body.name or "").strip()
     if "fetch_interval_minutes" in sent:
         feed.fetch_interval_minutes = body.fetch_interval_minutes
     if "enabled" in sent and body.enabled is not None:
         feed.enabled = body.enabled
+    if "group_id" in sent:
+        feed.group_id = body.group_id
     session.commit()
     return _feed_out(session, feed)
 
@@ -217,8 +258,9 @@ def delete_feed(feed_id: int, session: SessionDep) -> None:
 
 
 @router.post("/{feed_id}/fetch", response_model=FetchOut)
-def fetch_now(feed_id: int, session: SessionDep, client: ClientDep) -> FetchOut:
+def fetch_now(feed_id: int, request: Request, session: SessionDep, client: ClientDep) -> FetchOut:
     """有効/無効にかかわらず今すぐ1回取得する。失敗は例外にせず last_fetch_* に反映する。"""
     feed = _get_feed(session, feed_id)
-    added = fetch_and_store(session, feed, client=client)
+    added = fetch_and_store(session, feed, client=client, translation=get_settings().translation)
+    _wake_ai_runner(request)
     return FetchOut(added=added, feed=_feed_out(session, feed))

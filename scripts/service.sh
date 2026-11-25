@@ -118,7 +118,7 @@ install)
     fi
     for svc in "${SERVICES[@]}"; do
         if is_running "$svc"; then
-            echo "$svc が scripts/start.sh で起動中です。先に scripts/stop.sh を実行してください" >&2
+            echo "$svc が scripts/start.sh で起動中です。先に scripts/stop.sh（または ${svc}_stop.sh）を実行してください" >&2
             exit 1
         fi
     done

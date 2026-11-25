@@ -36,6 +36,7 @@ cp config/config.yaml.example config/config.yaml
 | `summary.interval` | サマリの周期（`daily` / `weekly` / `monthly`） |
 | `slack.enabled` / `slack.webhook_url` | Slack通知（無効でも動作します） |
 | `ai.command` | Claude Code CLI の絶対パス（`which claude`）。launchd 経由では PATH が限られるため推奨 |
+| `translation.enabled` / `translation.max_per_fetch` | 日本語以外の新着記事を取得時にAIで日本語へ自動翻訳するか（既定 `true`）と、1回の取得で自動翻訳する件数の上限（既定20）。`false` でも記事詳細の「日本語に翻訳」から手動で翻訳できます |
 
 ### 画面の公開先IP（`.env`）
 
@@ -63,6 +64,10 @@ cp .env.example .env
 ```bash
 scripts/start.sh   # backend と frontend をバックグラウンドで起動
 scripts/stop.sh    # 停止
+
+# 片方だけ起動・停止する場合（PID・ログは一括と共通なので、混在して停止できます）
+scripts/backend_start.sh  / scripts/backend_stop.sh
+scripts/frontend_start.sh / scripts/frontend_stop.sh
 ```
 
 ブラウザで `http://127.0.0.1:3700`（`LAN_IP` / `TAILSCALE_IP` を指定した場合はそのIP、ポートは `frontend.port`）を開きます。ログは `logs/{backend,backend.stderr,frontend}.log` です（JST 0時に日次ローテーションし、`config.yaml` の `logging.retention_days`（既定7日）を超えた世代は自動削除されます）。
@@ -78,7 +83,7 @@ scripts/service.sh uninstall # 登録を解除
 ```
 
 - `LAN_IP` / `TAILSCALE_IP` は `install` 時の値が plist に固定されます。変えるときは `.env` を直して `install` を再実行してください
-- `scripts/start.sh` と `service.sh` は同時には使えません（二重起動を防ぐため、片方が動いていると拒否されます）
+- `scripts/start.sh` と `service.sh` は同時には使えません（二重起動を防ぐため、片方が動いていると拒否されます。個別の `{backend,frontend}_start.sh` も同様です）
 
 ## 4. 定期実行ジョブの登録
 
@@ -87,14 +92,14 @@ scripts/service.sh uninstall # 登録を解除
 ```bash
 scripts/fetch-job.sh install     # フィード取得（既定: 300秒ごとに、取得間隔を過ぎたフィードのみ取得）
 scripts/summary-job.sh install   # サマリ生成（既定: 3600秒ごとに起動し、期間が終わっていれば生成）
-scripts/backup-job.sh install    # DBバックアップ（毎日3:00）
+scripts/backup-job.sh install    # DBバックアップ（既定 毎日3:00。時刻指定は install 04:30 のように渡す）
 ```
 
 操作は `status` / `start`（今すぐ1回）/ `stop` / `run`（ターミナルで1回実行）/ `uninstall`。ログは `logs/fetch.log` / `logs/summary.log` / `logs/backup.log` です（同じく日次ローテーションします）。Slack通知を有効にしている場合、サマリの生成完了（失敗も）が通知されます。
 
 ### DBのバックアップとリストア
 
-記事・サマリ・既読状態・フィード購読・フィードバック履歴はすべて DB（`db.path`）にあり、失うと復元できません。`scripts/backup-job.sh install` で、毎日3:00にバックアップします（稼働中でも整合したコピーを作ります）。
+記事・サマリ・既読状態・フィード購読・フィードバック履歴はすべて DB（`db.path`）にあり、失うと復元できません。`scripts/backup-job.sh install` で、既定で毎日3:00にバックアップします（`scripts/backup-job.sh install 04:30` のように時刻を指定でき、再実行で更新できます）（稼働中でも整合したコピーを作ります）。
 
 - 保存先は `config.yaml` の `backup.dir`（既定 `~/Backups/deep-tracker`）配下の `<instance>/` で、ファイル名は `deep-tracker-<instance>-YYYYmmdd-HHMMSS.db`（JST）です。`instance` ごとに分かれるため、並行稼働するバージョン間で衝突しません
 - `backup.retention_days`（既定30）より古いバックアップは自動で削除されます（このジョブのファイル名のものだけが対象です）

@@ -32,3 +32,6 @@ ai:
   # model: sonnet # 未指定ならCLIの既定
   timeout_seconds: 300 # 1回のAI呼び出しのタイムアウト（秒）
   max_concurrent_jobs: 1 # AIジョブの同時実行数。サブスクリプションの制限を踏まえ既定は逐次
+translation:
+  enabled: true # 取得時に日本語以外の新着記事を自動で日本語に翻訳する（false でも記事詳細から手動で翻訳できる）
+  max_per_fetch: 20 # 1回の取得（1フィード）で自動翻訳する件数の上限（新しい順）。超過分は手動で翻訳できる

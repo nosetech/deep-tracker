@@ -3,10 +3,18 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SHELL_REFRESH_EVENT } from "@/components/AppShell";
+import { BookmarkIcon } from "@/components/BookmarkIcon";
 import { useToast } from "@/components/Toast";
 import { ApiErrorPanel, LoadingSkeleton } from "@/components/states";
+import { TranslatedBadge } from "@/components/Translation";
 import { api } from "@/lib/api/client";
-import type { ArticleListItem, Feed } from "@/lib/api/types";
+import type { ArticleListItem, Feed, FeedGroup } from "@/lib/api/types";
+import {
+  feedFilterQuery,
+  groupFeeds,
+  groupFilterValue,
+  parseFeedFilter,
+} from "@/lib/feed-groups";
 import { loadSessionState, saveSessionState } from "@/lib/session-state";
 
 const PER_PAGE = 20;
@@ -16,6 +24,7 @@ type Period = "all" | "1" | "3" | "7" | "30";
 
 type Filter = {
   unreadOnly: boolean;
+  markedOnly: boolean;
   feed: string;
   period: Period;
   q: string;
@@ -23,6 +32,7 @@ type Filter = {
 
 const INITIAL_FILTER: Filter = {
   unreadOnly: true,
+  markedOnly: false,
   feed: "all",
   period: "all",
   q: "",
@@ -45,7 +55,10 @@ function parseFilter(raw: unknown): Filter | null {
     return null;
   return {
     unreadOnly: r.unreadOnly,
-    feed: r.feed === "all" || /^\d+$/.test(r.feed) ? r.feed : "all",
+    // 古い形式（markedOnly なし）の保存値は未指定扱い
+    markedOnly: r.markedOnly === true,
+    // "all"・フィードID・グループ（"g:<id>"）
+    feed: parseFeedFilter(r.feed) ? r.feed : "all",
     period: r.period as Period,
     q: r.q,
   };
@@ -81,13 +94,14 @@ function truncate(s: string, n: number): string {
 // 期間は取得のたびに現在時刻から算出する
 function buildQuery(f: Filter) {
   return {
-    feed_id: f.feed === "all" ? undefined : Number(f.feed),
+    ...feedFilterQuery(f.feed),
     since:
       f.period === "all"
         ? undefined
         : new Date(Date.now() - Number(f.period) * 86400000).toISOString(),
     q: f.q || undefined,
     unread_only: f.unreadOnly,
+    marked_only: f.markedOnly,
   };
 }
 
@@ -114,6 +128,7 @@ export default function ArticlesPage() {
   const router = useRouter();
   const toast = useToast();
   const [feeds, setFeeds] = useState<Feed[] | null>(null);
+  const [feedGroups, setFeedGroups] = useState<FeedGroup[]>([]);
   // 記事を開いて戻ったときに条件を復元する（初回は保存済みの条件があればそれを使う）
   const [restored] = useState(() =>
     loadSessionState(FILTER_STORAGE_KEY, parseFilter),
@@ -123,6 +138,8 @@ export default function ArticlesPage() {
   const [items, setItems] = useState<ArticleListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [unreadTotal, setUnreadTotal] = useState(0);
+  // 「マーク済みのみ」＋「未読のみ」のとき、既読を含めたマーク済みの有無（空表示の出し分け用）
+  const [markedAny, setMarkedAny] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -144,16 +161,25 @@ export default function ArticlesPage() {
   }, [filter, qInput]);
 
   useEffect(() => {
-    api
-      .listFeeds()
-      .then((list) => {
+    Promise.all([
+      api.listFeeds(),
+      // グループが取得できなくてもフィード単位の絞り込みは使えるようにする
+      api.listFeedGroups().catch(() => null),
+    ])
+      .then(([list, groupList]) => {
         setFeeds(list);
-        // 削除済みのフィードが復元された場合は絞り込みを外す
-        setFilter((f) =>
-          f.feed === "all" || list.some((x) => String(x.id) === f.feed)
-            ? f
-            : { ...f, feed: "all" },
-        );
+        setFeedGroups(groupList ?? []);
+        // 削除済みのフィード・グループが復元された場合は絞り込みを外す
+        setFilter((f) => {
+          const v = parseFeedFilter(f.feed);
+          const exists =
+            v?.kind === "all" ||
+            (v?.kind === "feed" && list.some((x) => x.id === v.id)) ||
+            // グループ一覧を取得できなかったときは、保存済みのグループの絞り込みを残す
+            (v?.kind === "group" &&
+              (groupList === null || groupList.some((g) => g.id === v.id)));
+          return exists ? f : { ...f, feed: "all" };
+        });
       })
       .catch(() => setFeeds([]));
   }, []);
@@ -166,14 +192,18 @@ export default function ArticlesPage() {
     setLoaded(false);
     setLoadError(false);
     try {
-      const [list, unread] = await Promise.all([
+      const [list, unread, marked] = await Promise.all([
         api.listArticles({ ...query, per_page: PER_PAGE }),
         api.listArticles({ ...query, unread_only: true, per_page: 1 }),
+        filter.markedOnly && filter.unreadOnly
+          ? api.listArticles({ ...query, unread_only: false, per_page: 1 })
+          : null,
       ]);
       if (gen !== generation.current) return;
       setItems(list.items);
       setTotal(list.total);
       setUnreadTotal(unread.total);
+      setMarkedAny(marked ? marked.total > 0 : list.total > 0);
       setLoadError(false);
       setLoaded(true);
     } catch {
@@ -188,10 +218,16 @@ export default function ArticlesPage() {
     void load();
   }, [load]);
 
-  // 未読のみ表示中は既読にした記事を一覧から外す
+  // 未読のみ表示中は既読にした記事を、マーク済みのみ表示中はマークを外した記事を一覧から外す
+  const filtered = filter.unreadOnly || filter.markedOnly;
   const visible = useMemo(
-    () => (filter.unreadOnly ? items.filter((a) => !a.is_read) : items),
-    [items, filter.unreadOnly],
+    () =>
+      items.filter(
+        (a) =>
+          (!filter.unreadOnly || !a.is_read) &&
+          (!filter.markedOnly || a.is_marked),
+      ),
+    [items, filter.unreadOnly, filter.markedOnly],
   );
   const groups = useMemo(() => groupByDay(visible), [visible]);
   const visibleUnread = useMemo(
@@ -199,13 +235,14 @@ export default function ArticlesPage() {
     [visible],
   );
   const hasMore = items.length < total;
-  const filterActive =
+  const otherFilterActive =
     filter.feed !== "all" || filter.period !== "all" || filter.q !== "";
+  const filterActive = otherFilterActive || filter.markedOnly;
 
   const loadMore = async () => {
     // 既読で外した分を除いた件数を、サーバー側の取得済み位置とみなす
     const gen = generation.current;
-    const matched = filter.unreadOnly ? visible.length : items.length;
+    const matched = filtered ? visible.length : items.length;
     // 既読で位置がずれても取りこぼさないよう、大きめの窓で取得して重複を除く
     const page = Math.floor(matched / MORE_PER_PAGE) + 1;
     setLoadingMore(true);
@@ -220,9 +257,7 @@ export default function ArticlesPage() {
         const seen = new Set(cur.map((a) => a.id));
         return [...cur, ...list.items.filter((a) => !seen.has(a.id))];
       });
-      setTotal(
-        list.total + (filter.unreadOnly ? items.length - visible.length : 0),
-      );
+      setTotal(list.total + (filtered ? items.length - visible.length : 0));
     } catch {
       toast("記事の取得に失敗しました", "error");
     } finally {
@@ -256,6 +291,33 @@ export default function ArticlesPage() {
     toast(next ? "既読にしました" : "未読に戻しました", "info", {
       label: "元に戻す",
       onClick: () => void setOne({ ...a, is_read: next }, a.is_read),
+    });
+  };
+
+  const setMark = async (a: ArticleListItem, isMarked: boolean) => {
+    try {
+      await api.setArticleMarked(a.id, isMarked);
+    } catch {
+      toast(
+        isMarked
+          ? "マークできませんでした。時間をおいて再度お試しください。"
+          : "マークを外せませんでした。時間をおいて再度お試しください。",
+        "error",
+      );
+      return false;
+    }
+    setItems((cur) =>
+      cur.map((x) => (x.id === a.id ? { ...x, is_marked: isMarked } : x)),
+    );
+    return true;
+  };
+
+  const toggleMark = async (a: ArticleListItem) => {
+    const next = !a.is_marked;
+    if (!(await setMark(a, next))) return;
+    toast(next ? "マークしました" : "マークを外しました", "info", {
+      label: "元に戻す",
+      onClick: () => void setMark({ ...a, is_marked: next }, a.is_marked),
     });
   };
 
@@ -295,7 +357,13 @@ export default function ArticlesPage() {
 
   const clearFilter = () => {
     setQInput("");
-    setFilter((f) => ({ ...f, feed: "all", period: "all", q: "" }));
+    setFilter((f) => ({
+      ...f,
+      feed: "all",
+      period: "all",
+      q: "",
+      markedOnly: false,
+    }));
   };
 
   const noFeeds = feeds !== null && feeds.length === 0;
@@ -330,6 +398,15 @@ export default function ArticlesPage() {
         label: "購読フィードを開く",
         onClick: () => router.push("/feeds"),
       };
+    else if (filter.markedOnly && !markedAny)
+      empty = {
+        title: "マーク済みの記事はありません",
+        text: otherFilterActive
+          ? "この条件に一致するマーク済みの記事はありません。"
+          : "記事のブックマークアイコンを押すと、あとで読み返したい記事をマークできます。",
+        label: "「マーク済みのみ」を解除",
+        onClick: () => setFilter((f) => ({ ...f, markedOnly: false })),
+      };
     else if (filter.unreadOnly && !hasMore)
       empty = {
         title: "未読の記事はありません",
@@ -348,9 +425,7 @@ export default function ArticlesPage() {
       };
   }
 
-  const shownCount = filter.unreadOnly
-    ? total - (items.length - visible.length)
-    : total;
+  const shownCount = filtered ? total - (items.length - visible.length) : total;
   const resultLabel = `${shownCount}件${hasMore ? "中" : "を表示"}${
     hasMore ? ` ${visible.length}件を表示` : ""
   }${filter.unreadOnly ? "" : `（未読 ${unreadTotal}件）`}`;
@@ -416,11 +491,31 @@ export default function ArticlesPage() {
               aria-label="フィードで絞り込み"
             >
               <option value="all">すべてのフィード</option>
-              {(feeds ?? []).map((f) => (
-                <option key={f.id} value={f.id}>
-                  {truncate(f.name, 24)}
-                </option>
-              ))}
+              {feedGroups.length === 0
+                ? (feeds ?? []).map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {truncate(f.name, 24)}
+                    </option>
+                  ))
+                : groupFeeds(feedGroups, feeds ?? []).map(
+                    ({ group, feeds: fs }) => (
+                      <optgroup
+                        key={group?.id ?? "none"}
+                        label={group ? group.name : "未分類"}
+                      >
+                        {group && (
+                          <option value={groupFilterValue(group.id)}>
+                            {group.name}（すべて）
+                          </option>
+                        )}
+                        {fs.map((f) => (
+                          <option key={f.id} value={f.id}>
+                            {truncate(f.name, 24)}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ),
+                  )}
             </select>
             <select
               className="art-select art-select-period"
@@ -436,6 +531,21 @@ export default function ArticlesPage() {
               <option value="7">過去7日</option>
               <option value="30">過去30日</option>
             </select>
+            <button
+              type="button"
+              className={`art-marked-filter${filter.markedOnly ? " is-on" : ""}`}
+              aria-pressed={filter.markedOnly}
+              onClick={() =>
+                setFilter((f) => ({ ...f, markedOnly: !f.markedOnly }))
+              }
+            >
+              <BookmarkIcon
+                filled={filter.markedOnly}
+                size={14}
+                strokeWidth={2}
+              />
+              マーク済みのみ
+            </button>
             <div className="art-spacer" />
             <button
               type="button"
@@ -500,12 +610,13 @@ export default function ArticlesPage() {
                 >
                   <span className="art-dot" aria-hidden="true" />
                   <span className="art-body">
-                    <span className="art-title">{a.title}</span>
+                    <span className="art-title">{a.title_ja ?? a.title}</span>
                     <span className="art-meta">
                       <span className="art-meta-feed">{a.feed_name}</span>
                       {d && (
                         <span className="art-meta-time">{formatTime(d)}</span>
                       )}
+                      {a.translated_at && <TranslatedBadge />}
                     </span>
                     {a.excerpt && (
                       <span className="art-excerpt">
@@ -513,6 +624,16 @@ export default function ArticlesPage() {
                       </span>
                     )}
                   </span>
+                </button>
+                <button
+                  type="button"
+                  className={`art-mark${a.is_marked ? " is-on" : ""}`}
+                  aria-pressed={a.is_marked}
+                  aria-label={a.is_marked ? "マークを外す" : "マークする"}
+                  title={a.is_marked ? "マークを外す" : "マークする"}
+                  onClick={() => void toggleMark(a)}
+                >
+                  <BookmarkIcon filled={a.is_marked} />
                 </button>
                 <button
                   type="button"

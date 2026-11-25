@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from deep_tracker.ai import AIError, AIProvider
+from deep_tracker.ai.output import strip_code_fence
 from deep_tracker.db import Article, Summary
 from deep_tracker.jobs.ai_jobs import (
     STATUS_FAILED,
@@ -52,20 +53,10 @@ def load_prompt() -> str:
     return resources.files("deep_tracker.summary").joinpath("prompts/summary.md").read_text("utf-8")
 
 
-def _strip_code_fence(text: str) -> str:
-    text = text.strip()
-    if text.startswith("```"):
-        lines = text.splitlines()
-        if lines[-1].strip() == "```":
-            lines = lines[:-1]
-        text = "\n".join(lines[1:])
-    return text.strip()
-
-
 def parse_summary_output(text: str, valid_article_ids: set[int]) -> dict[str, Any]:
     """AIの出力を検証して返す。入力に無い記事IDは取り除き、不正なら InvalidSummaryOutput。"""
     try:
-        output = _SummaryOutput.model_validate_json(_strip_code_fence(text))
+        output = _SummaryOutput.model_validate_json(strip_code_fence(text))
     except ValidationError as e:
         raise InvalidSummaryOutput(
             f"サマリの出力が不正です: {e.error_count()} 件の検証エラー"

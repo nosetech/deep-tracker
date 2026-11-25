@@ -38,7 +38,7 @@ cd frontend && npm run dev
 
 動作確認: `curl http://localhost:3700/api/health` が `{"status":"ok"}` を返せば、frontend から backend への中継まで通っている。
 バックエンドの接続先を変える場合は、frontend の環境変数 `BACKEND_URL`（既定 `http://127.0.0.1:8700`。実行時に読まれる）を指定する。
-backend と frontend をまとめてバックグラウンドで起動・停止するには `scripts/start.sh` / `scripts/stop.sh`（開発サーバで起動するには `FRONTEND_MODE=dev scripts/start.sh`。LAN公開は `LAN_IP` / `TAILSCALE_IP` で行う。`docs/setup.md`）。
+backend と frontend をまとめてバックグラウンドで起動・停止するには `scripts/start.sh` / `scripts/stop.sh`（片方だけなら `scripts/{backend,frontend}_{start,stop}.sh`。PID・ログは共通。開発サーバで起動するには `FRONTEND_MODE=dev scripts/start.sh`。LAN公開は `LAN_IP` / `TAILSCALE_IP` で行う。`docs/setup.md`）。
 
 ## 動作確認用インスタンス
 
@@ -79,7 +79,7 @@ npm run build
 
 ## 画面実装のルール
 
-画面は Claude Design のデザインを**正**として実装し、独自解釈でレイアウト・配色・インタラクションを変えない。デザインの参照方法と注意点は `CLAUDE.md` の「画面デザインの実装ルール」に従うこと。
+画面は Claude の Artifacts にあるデザインを**正**として実装し、独自解釈でレイアウト・配色・インタラクションを変えない。デザインの参照方法と注意点は `CLAUDE.md` の「画面デザインの実装ルール」に従うこと。
 
 ## バージョンの更新
 
@@ -87,7 +87,7 @@ npm run build
 
 ## 配布物（dist/）とリリース
 
-リリースは GitHub Releases の tarball（`deep-tracker-<version>.tar.gz` と `.sha256`）で配布する。`v*.*.*` タグの push で `.github/workflows/release.yml` が、バージョン一致の検証 → backend / frontend の lint・テスト・ビルド → tarball 作成 → Release 公開まで行う。frontend は Next.js の standalone 出力をビルド済みで同梱し、利用者側の npm / ビルドは不要。
+リリースは GitHub Releases の tarball（`deep-tracker-<version>.tar.gz` と `.sha256`）で配布する。`v*.*.*` タグの push で `.github/workflows/release.yml` が、バージョン一致の検証 → backend / frontend の lint・テスト・ビルド → tarball 作成 → Release 公開まで行う。frontend は Next.js の standalone 出力をビルド済みで同梱し、利用者側の npm / ビルドは不要。standalone 出力は環境変数 `NEXT_OUTPUT=standalone` のときだけ有効になる（`release.yml` が指定。通常のビルドで有効にすると `next start` が警告するため）。
 
 ### dist/ と開発用ファイルの対応
 

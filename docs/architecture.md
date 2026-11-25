@@ -87,12 +87,12 @@
 
 `POST /api/feeds` と `PATCH /api/feeds/{id}`（URL変更）は、失敗時に `detail.code` で原因を区別する。
 
-| ステータス | code | 意味 |
-| --- | --- | --- |
-| 422 | `invalid_url` | URLの形式が不正（http / https 以外など） |
-| 409 | `duplicate_url` | 登録済みのURL |
-| 422 | `fetch_failed` | 取得に失敗（接続失敗・タイムアウト・HTTPエラー）。`detail.reason`（`http_status` / `timeout` / `connect`）と、HTTPエラーのときは `detail.http_status` を含む |
-| 422 | `not_a_feed` | 取得できたが RSS / Atom / JSON Feed として解析できない |
+| ステータス | code            | 意味                                                                                                                                                         |
+| ---------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 422        | `invalid_url`   | URLの形式が不正（http / https 以外など）                                                                                                                     |
+| 409        | `duplicate_url` | 登録済みのURL                                                                                                                                                |
+| 422        | `fetch_failed`  | 取得に失敗（接続失敗・タイムアウト・HTTPエラー）。`detail.reason`（`http_status` / `timeout` / `connect`）と、HTTPエラーのときは `detail.http_status` を含む |
+| 422        | `not_a_feed`    | 取得できたが RSS / Atom / JSON Feed として解析できない                                                                                                       |
 
 - 画面は code ごとに文言を出し分ける。`not_a_feed` は「RSS / Atom として解析できませんでした。」、`fetch_failed` は「フィードを取得できませんでした。」を前置する。解析エラーの前置きを取得エラーに付けない。
 - `fetch_failed` には本文の下に `fetch_failed · 429` 形式のコード行を等幅で出し、ステータス別の補足を付ける（429・403: 配信元がアクセスを制限している可能性があり別のフィード URL を試す／404: URL を確認する／5xx: 時間をおいて再試行／タイムアウト・接続失敗: URL とネットワークを確認する）。文言は `frontend/lib/feed-error.ts`。
@@ -103,19 +103,19 @@
 
 バージョン（例: `0.1.0` と `0.2.0`）ごとに展開先ディレクトリを分け、設定ファイルも各展開先に同梱する。バージョン間で衝突する資源は、すべて設定ファイルの値から導出する。
 
-| 資源            | 割り当て方針                                                                                                                                                                                             |
-| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ポート          | バージョンごとに設定ファイルで指定する。`backend.port` と `frontend.port` を別々に持ち、既定は backend 8700 / frontend 3700。並行稼働する際は、バージョンごとに +10 ずつずらす（例: 8710 / 3710）        |
-| DBパス          | `db.path` で指定する。既定は展開先配下の `data/deep-tracker.db`。展開先ごとに別ファイルになるため衝突しない                                                                                              |
+| 資源            | 割り当て方針                                                                                                                                                                                                        |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ポート          | バージョンごとに設定ファイルで指定する。`backend.port` と `frontend.port` を別々に持ち、既定は backend 8700 / frontend 3700。並行稼働する際は、バージョンごとに +10 ずつずらす（例: 8710 / 3710）                   |
+| DBパス          | `db.path` で指定する。既定は展開先配下の `data/deep-tracker.db`。展開先ごとに別ファイルになるため衝突しない                                                                                                         |
 | launchdジョブ名 | `com.nosetech.deep-tracker.<instance>.<job>` とする。`<instance>` は設定ファイルの `instance`（既定 `default`、並行稼働時はバージョン番号など）、`<job>` は `backend` / `frontend` / `fetch` / `summary` / `backup` |
-| plist・ログ     | 展開先配下の `logs/` に出力する。plist は展開時に `instance` を埋め込んで生成する                                                                                                                        |
+| plist・ログ     | 展開先配下の `logs/` に出力する。plist は展開時に `instance` を埋め込んで生成する                                                                                                                                   |
 
 - 同じ DB ファイルを複数バージョンが同時に開かないこと。スキーマの異なるバージョンが同一DBを触るとマイグレーションが衝突するため、DBパスは必ずバージョンごとに分ける。
 - ポートが使用中の場合、起動時にエラーで終了する（自動で別ポートへ退避しない）。
 
 ### DBバックアップ
 
-- `backend/deep_tracker/jobs/backup.py`（`python -m deep_tracker.jobs.backup`）を、launchd のジョブ `backup`（`scripts/backup-job.sh`）が毎日3:00（`StartCalendarInterval`）に実行する。
+- `backend/deep_tracker/jobs/backup.py`（`python -m deep_tracker.jobs.backup`）を、launchd のジョブ `backup`（`scripts/backup-job.sh`）が毎日（既定3:00。`install HH:MM` で変更可）（`StartCalendarInterval`）に実行する。
 - 方式は SQLite のオンラインバックアップAPI（標準ライブラリの `sqlite3.Connection.backup()`）。DBは WAL モードだが、このAPIは稼働中でも整合したスナップショットを作る。`cp` は `-wal` / `-shm` の取りこぼしや書き込みとの競合で不整合になりうるため使わない。外部の `sqlite3` コマンドにも依存しない。
 - 一時ファイル（`*.db.tmp`）に書き、`PRAGMA integrity_check` で検証してから rename する。失敗時は一時ファイルを消し、不完全なバックアップを残さない。バックアップは `journal_mode=DELETE` の単一ファイルにする。
 - 保存先は `<backup.dir>/<instance>/deep-tracker-<instance>-YYYYmmdd-HHMMSS.db`（JST）。`instance` ごとにディレクトリとファイル名を分けて、並行稼働するバージョン間の衝突を防ぐ。
@@ -127,7 +127,7 @@
 
 - `backend.log` / `frontend.log` / `fetch.log` / `summary.log` / `backup.log` を、JST 0時に日次ローテーションする（`TimedRotatingFileHandler` のサブクラス `JstMidnightRotatingFileHandler`。0時の判定・世代ファイル名 `*.log.YYYY-MM-DD`・ログ内の時刻をOSのタイムゾーンに依存させずJSTに固定する。`backend/deep_tracker/logging_config.py`）。
 - 保持日数は設定 `logging.retention_days`（既定7、1以上の整数）。超えた世代はハンドラが自動削除する。
-- logging を経由しない出力は、`python -m deep_tracker.log_rotator --path <file>`（標準入力を加工せず書き出すローテータ）へパイプして書き出す。対象は frontend（Next.js）の出力と、backend 本体の標準出力・標準エラー（起動前のクラッシュ・未捕捉例外。`backend.log` と同じパスを2プロセスが開くとローテーションが競合するため `backend.stderr.log` に分ける）。`scripts/start.sh` は `>>` リダイレクトではなくプロセス置換でパイプし、launchd の plist も `StandardOutPath` を使わず `bash -c` で同じパイプを組む。ローテータは書き込みエラー・設定読み込み失敗・不正なUTF-8でも落ちない（落ちると本体が SIGPIPE を受けるため）。
+- logging を経由しない出力は、`python -m deep_tracker.log_rotator --path <file>`（標準入力を加工せず書き出すローテータ）へパイプして書き出す。対象は frontend（Next.js）の出力と、backend 本体の標準出力・標準エラー（起動前のクラッシュ・未捕捉例外。`backend.log` と同じパスを2プロセスが開くとローテーションが競合するため `backend.stderr.log` に分ける）。`scripts/start.sh`（個別の `{backend,frontend}_start.sh` も同じ）は `>>` リダイレクトではなくプロセス置換でパイプし、launchd の plist も `StandardOutPath` を使わず `bash -c` で同じパイプを組む。ローテータは書き込みエラー・設定読み込み失敗・不正なUTF-8でも落ちない（落ちると本体が SIGPIPE を受けるため）。
 - `*.launchd.log`（fetch / summary / backup の起動直後のクラッシュ専用）は plist のまま。通常ログは logging 経由で、端末から手動実行したときだけ標準出力にも出す。
 - 動作確認用インスタンス（`scripts/dev-instance.sh`）は `.dev-run/` に出すだけでローテーションしない。
 
@@ -193,6 +193,14 @@ config/
 | fetched_at   | datetime              | 取得日時                                        |
 | is_read      | boolean               | 既読フラグ（既定 false）                        |
 | read_at      | datetime NULL         | 既読日時                                        |
+| is_marked    | boolean               | マークフラグ（既定 false）。既読とは独立        |
+| marked_at    | datetime NULL         | マーク日時                                      |
+| language     | text NULL             | 言語判定の結果（`ja` / `other`）。NULL は未判定（翻訳機能の追加前の記事。APIはその場で判定して返す） |
+| title_ja / content_ja | text NULL    | 日本語訳。未翻訳は NULL。原文（`title` / `content`）は変更しない |
+| translated_at | datetime NULL        | 翻訳日時                                        |
+| translation_truncated | boolean      | 本文が長いため先頭のみ翻訳した（既定 false）    |
+
+言語判定（`deep_tracker/translate/detect.py`）はAIを使わず、HTMLタグを除いたタイトル＋本文で、仮名の文字数が「仮名＋漢字＋ハングルの文字数＋ラテン文字等の単語数」の15%以上なら日本語とする（漢字のみの中国語は日本語以外）。新規記事の保存時に判定して `language` に保存し、日本語以外の記事は設定 `translation.enabled` が true なら新しい順に `translation.max_per_fetch` 件まで `translate_article` ジョブに投入する（定期取得バッチ・フィード登録・URL変更・今すぐ取得のいずれも同じ）。翻訳は本文の先頭 20,000 文字まで（タグの途中では切らない）で、HTMLは保ったまま訳させる（表示時に `sanitizeHtml` を通す）。プロンプトは `backend/deep_tracker/translate/prompts/translate.md`、出力は `{"title", "content"}` のJSON。手動翻訳は `POST /api/articles/{id}/translate`（翻訳済みは409。待機中・実行中のジョブがあればそれを返す）。記事詳細APIは最新の翻訳ジョブ（`translation_job`）を返し、GUIは翻訳中・失敗・利用制限を表示する。
 
 **summaries**（サマリ）
 
@@ -208,14 +216,14 @@ config/
 
 **summary_articles**（サマリと元記事の関連。PK は `(summary_id, article_id)`）
 
-どちらの親が削除されても関連行のみ連鎖削除される。記事が保存期間で削除されてもサマリ本体は残る（関連行のみ消え、サマリ上の元記事リンクは無効として扱う）。保存期間の起点は取得日時（`fetched_at`）。公開日時だと、フィードに残る古い記事が削除後に再取得されて未読として復活するため。削除は定期取得バッチの末尾で実行し、削除件数をログに出す。
+どちらの親が削除されても関連行のみ連鎖削除される。記事が保存期間で削除されてもサマリ本体は残る（関連行のみ消え、サマリ上の元記事リンクは無効として扱う）。保存期間の起点は取得日時（`fetched_at`）。公開日時だと、フィードに残る古い記事が削除後に再取得されて未読として復活するため。マーク済み（`is_marked`）の記事は削除の対象外で、マークを外すと再び対象になる。削除は定期取得バッチの末尾で実行し、削除件数をログに出す。
 
 **ai_jobs**（AIジョブ）
 
 | カラム                                | 型         | 説明                                           |
 | ------------------------------------- | ---------- | ---------------------------------------------- |
 | id                                    | integer PK |                                                |
-| kind                                  | text       | ジョブ種別（例: `summary`）                    |
+| kind                                  | text       | ジョブ種別（`summary` / `translate_article`）  |
 | status                                | text       | `pending` / `running` / `succeeded` / `failed` |
 | input / result                        | JSON NULL  | 入力・結果                                     |
 | error                                 | text NULL  | 失敗理由                                       |
@@ -227,6 +235,7 @@ config/
 
 - バックエンド起動時にワーカーを `ai.max_concurrent_jobs`（既定1＝逐次）本起動し、`pending` を作成順に処理する。取得は `UPDATE ... WHERE status='pending'` で行い、二重実行しない。
 - 失敗時は `error` に理由を保存し、自動リトライはしない。利用制限エラーは `error` が「利用制限に達しました」で始まり、API の `rate_limited` が true になる（GUIは再試行を促す）。
+- 利用制限に達した場合は、その時点で待機中（`pending`）のジョブを種別を問わず実行せずに `failed` とし、`error` に「利用制限に達しました: 先に実行したAIジョブ（id=N）が利用制限に達したため、実行しませんでした（解除予定: …）」を保存する（`rate_limited` が true になり、GUIから再試行できる）。制限中に1件ずつCLIを呼んで失敗し続けないため。実行中のジョブには影響しない。その後に追加されたジョブは通常どおり実行する。
 - 起動時に `running` のまま残ったジョブは `failed`（再起動により中断）として整理する。
 - 状態取得API: `GET /api/ai-jobs`（`status` / `kind` / `limit`）、`GET /api/ai-jobs/{id}`。
 
@@ -241,11 +250,12 @@ config/
 
 ### 5-4. 索引
 
-| 索引                              | 用途                                                                           |
-| --------------------------------- | ------------------------------------------------------------------------------ |
-| `articles(published_at)`          | 新着順の一覧、保存期間による削除                                               |
-| `articles(feed_id, published_at)` | フィード別の一覧。`(feed_id, guid)` の一意索引はフィード単位の絞り込みにも効く |
-| `articles(is_read, published_at)` | 未読のみの一覧                                                                 |
-| `summary_articles(article_id)`    | 記事からサマリへの逆引き                                                       |
-| `summaries(period_start)`         | サマリ一覧                                                                     |
-| `ai_jobs(status, created_at)`     | 未処理ジョブの取得                                                             |
+| 索引                                | 用途                                                                           |
+| ----------------------------------- | ------------------------------------------------------------------------------ |
+| `articles(published_at)`            | 新着順の一覧、保存期間による削除                                               |
+| `articles(feed_id, published_at)`   | フィード別の一覧。`(feed_id, guid)` の一意索引はフィード単位の絞り込みにも効く |
+| `articles(is_read, published_at)`   | 未読のみの一覧                                                                 |
+| `articles(is_marked, published_at)` | マーク済みのみの一覧                                                           |
+| `summary_articles(article_id)`      | 記事からサマリへの逆引き                                                       |
+| `summaries(period_start)`           | サマリ一覧                                                                     |
+| `ai_jobs(status, created_at)`       | 未処理ジョブの取得                                                             |

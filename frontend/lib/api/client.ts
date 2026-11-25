@@ -1,12 +1,16 @@
 import type {
+  AiJob,
   AppConfig,
   ArticleDetail,
   ArticleList,
   ArticleQuery,
+  BulkEnabledResult,
   BulkReadResult,
   Feed,
+  FeedGroup,
   FetchResult,
   GenerationState,
+  MarkState,
   ReadState,
   SummaryConfig,
   SummaryDetail,
@@ -59,8 +63,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   listFeeds: () => request<Feed[]>("/feeds"),
-  createFeed: (url: string) =>
-    request<Feed>("/feeds", { method: "POST", body: JSON.stringify({ url }) }),
+  createFeed: (url: string, groupId: number | null = null) =>
+    request<Feed>("/feeds", {
+      method: "POST",
+      body: JSON.stringify({ url, group_id: groupId }),
+    }),
   updateFeed: (
     id: number,
     body: {
@@ -68,6 +75,7 @@ export const api = {
       url?: string;
       fetch_interval_minutes?: number | null;
       enabled?: boolean;
+      group_id?: number | null;
     },
   ) =>
     request<Feed>(`/feeds/${id}`, {
@@ -80,6 +88,29 @@ export const api = {
     request<FetchResult>(`/feeds/${id}/fetch`, { method: "POST" }),
   markFeedRead: (id: number) =>
     request<BulkReadResult>(`/feeds/${id}/mark-read`, { method: "POST" }),
+  listFeedGroups: () => request<FeedGroup[]>("/feed-groups"),
+  createFeedGroup: (name: string) =>
+    request<FeedGroup>("/feed-groups", {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+  renameFeedGroup: (id: number, name: string) =>
+    request<FeedGroup>(`/feed-groups/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name }),
+    }),
+  deleteFeedGroup: (id: number) =>
+    request<void>(`/feed-groups/${id}`, { method: "DELETE" }),
+  /** id が null のときは未分類のフィードが対象 */
+  markFeedGroupRead: (id: number | null) =>
+    request<BulkReadResult>(`/feed-groups/${id ?? "ungrouped"}/mark-read`, {
+      method: "POST",
+    }),
+  setFeedGroupEnabled: (id: number | null, enabled: boolean) =>
+    request<BulkEnabledResult>(`/feed-groups/${id ?? "ungrouped"}/enabled`, {
+      method: "POST",
+      body: JSON.stringify({ enabled }),
+    }),
   markUnread: (articleIds: number[]) =>
     request<BulkReadResult>("/articles/mark-unread", {
       method: "POST",
@@ -92,15 +123,31 @@ export const api = {
     }
     return request<ArticleList>(`/articles?${params}`);
   },
-  getArticle: (id: number, opts: { unreadOnly?: boolean } = {}) =>
-    request<ArticleDetail>(
-      `/articles/${id}${opts.unreadOnly ? "?unread_only=true" : ""}`,
-    ),
+  getArticle: (
+    id: number,
+    opts: { unreadOnly?: boolean; markedOnly?: boolean } = {},
+  ) => {
+    const params = new URLSearchParams();
+    if (opts.unreadOnly) params.set("unread_only", "true");
+    if (opts.markedOnly) params.set("marked_only", "true");
+    const qs = params.toString();
+    return request<ArticleDetail>(`/articles/${id}${qs ? `?${qs}` : ""}`);
+  },
   setArticleRead: (id: number, isRead: boolean) =>
     request<ReadState>(`/articles/${id}/read`, {
       method: "PATCH",
       body: JSON.stringify({ is_read: isRead }),
     }),
+  setArticleMarked: (id: number, isMarked: boolean) =>
+    request<MarkState>(`/articles/${id}/mark`, {
+      method: "PATCH",
+      body: JSON.stringify({ is_marked: isMarked }),
+    }),
+  translateArticle: (id: number) =>
+    request<{ job_id: number }>(`/articles/${id}/translate`, {
+      method: "POST",
+    }),
+  getAiJob: (id: number) => request<AiJob>(`/ai-jobs/${id}`),
   getUnreadCounts: () => request<UnreadCounts>("/articles/unread-counts"),
   listSummaries: () => request<SummaryListItem[]>("/summaries"),
   getSummary: (id: number) => request<SummaryDetail>(`/summaries/${id}`),

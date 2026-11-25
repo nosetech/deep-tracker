@@ -77,3 +77,25 @@ def test_summary_kept(session, feed):
     purge_expired_articles(session, 365, now=now)
     assert session.get(Summary, s.id) is not None
     assert session.scalar(select(func.count()).select_from(SummaryArticle)) == 0
+
+
+def test_marked_article_is_not_purged(session, feed):
+    now = utcnow()
+    marked = add_article(session, feed, "marked", now - timedelta(days=400))
+    add_article(session, feed, "plain", now - timedelta(days=400))
+    marked.is_marked = True
+    session.commit()
+    assert purge_expired_articles(session, 365, now=now) == 1
+    assert session.scalars(select(Article.guid)).all() == ["marked"]
+
+
+def test_unmarked_article_is_purged_again(session, feed):
+    now = utcnow()
+    a = add_article(session, feed, "a", now - timedelta(days=400))
+    a.is_marked = True
+    session.commit()
+    assert purge_expired_articles(session, 365, now=now) == 0
+    a.is_marked = False
+    session.commit()
+    assert purge_expired_articles(session, 365, now=now) == 1
+    assert count(session) == 0

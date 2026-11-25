@@ -17,6 +17,12 @@ def _db_path() -> str:
 def run_migrations_online() -> None:
     engine = create_db_engine(_db_path())
     with engine.connect() as connection:
+        # SQLite の batch mode はテーブルを作り直す（コピー → DROP TABLE → リネーム）。外部キーが
+        # 有効なままだと、DROP TABLE が参照元の ON DELETE CASCADE / SET NULL を発火させて
+        # 関連する行（例: feeds を作り直すと articles）を消してしまう。マイグレーション中は
+        # 無効にし、終了後に整合性を検査する。PRAGMA foreign_keys はトランザクション外でのみ有効
+        connection.exec_driver_sql("PRAGMA foreign_keys=OFF")
+        connection.commit()
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
@@ -24,6 +30,11 @@ def run_migrations_online() -> None:
         )
         with context.begin_transaction():
             context.run_migrations()
+            violations = connection.exec_driver_sql("PRAGMA foreign_key_check").fetchall()
+            if violations:
+                raise RuntimeError(f"マイグレーション後に外部キーの不整合があります: {violations}")
+        connection.commit()
+        connection.exec_driver_sql("PRAGMA foreign_keys=ON")
     engine.dispose()
 
 

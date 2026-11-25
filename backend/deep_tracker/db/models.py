@@ -53,6 +53,20 @@ class Base(DeclarativeBase):
     type_annotation_map = {datetime: UtcDateTime}
 
 
+class FeedGroup(Base):
+    """フィードのグループ。フィードと同じくGUIで管理するデータ（設定ファイルでは扱わない）。"""
+
+    __tablename__ = "feed_groups"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), unique=True)
+    # 並び順（現状の表示は名前順。将来の並べ替え用）
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+    feeds: Mapped[list["Feed"]] = relationship(back_populates="group", passive_deletes=True)
+
+
 class Feed(Base):
     __tablename__ = "feeds"
 
@@ -70,7 +84,12 @@ class Feed(Base):
     # 条件付きGET用。次回取得時に If-None-Match / If-Modified-Since として送る
     etag: Mapped[str | None] = mapped_column(String(512))
     last_modified: Mapped[str | None] = mapped_column(String(128))
+    # 所属グループ。NULL は未分類。グループを削除すると NULL に戻る
+    group_id: Mapped[int | None] = mapped_column(
+        ForeignKey("feed_groups.id", ondelete="SET NULL"), index=True
+    )
 
+    group: Mapped[FeedGroup | None] = relationship(back_populates="feeds")
     articles: Mapped[list["Article"]] = relationship(
         back_populates="feed", cascade="all, delete-orphan", passive_deletes=True
     )
@@ -94,6 +113,7 @@ class Article(Base):
         Index("ix_articles_published_at", "published_at"),
         Index("ix_articles_feed_id_published_at", "feed_id", "published_at"),
         Index("ix_articles_is_read_published_at", "is_read", "published_at"),
+        Index("ix_articles_is_marked_published_at", "is_marked", "published_at"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -108,6 +128,17 @@ class Article(Base):
     fetched_at: Mapped[datetime] = mapped_column(default=utcnow)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     read_at: Mapped[datetime | None]
+    # マーク（ブックマーク）。既読/未読とは独立。マーク済みは保存期間による削除の対象外
+    is_marked: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    marked_at: Mapped[datetime | None]
+    # 言語判定の結果（ja / other）。NULL は未判定（翻訳機能の追加前に保存した記事）
+    language: Mapped[str | None] = mapped_column(String(8))
+    # 日本語訳。原文（title / content）は変更せず、翻訳は別列に持つ。未翻訳は NULL
+    title_ja: Mapped[str | None] = mapped_column(Text)
+    content_ja: Mapped[str | None] = mapped_column(Text)
+    translated_at: Mapped[datetime | None]
+    # 本文が長いため先頭のみ翻訳した
+    translation_truncated: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
 
     feed: Mapped[Feed] = relationship(back_populates="articles")
 
@@ -147,7 +178,7 @@ class AiJob(Base):
     __table_args__ = (Index("ix_ai_jobs_status_created_at", "status", "created_at"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    # 例: summary / article_summary
+    # 例: summary / translate_article
     kind: Mapped[str] = mapped_column(String(32))
     # pending / running / succeeded / failed
     status: Mapped[str] = mapped_column(String(16), default="pending", server_default="pending")
