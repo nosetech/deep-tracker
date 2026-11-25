@@ -53,6 +53,20 @@ class Base(DeclarativeBase):
     type_annotation_map = {datetime: UtcDateTime}
 
 
+class FeedGroup(Base):
+    """フィードのグループ。フィードと同じくGUIで管理するデータ（設定ファイルでは扱わない）。"""
+
+    __tablename__ = "feed_groups"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), unique=True)
+    # 並び順（現状の表示は名前順。将来の並べ替え用）
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+    feeds: Mapped[list["Feed"]] = relationship(back_populates="group", passive_deletes=True)
+
+
 class Feed(Base):
     __tablename__ = "feeds"
 
@@ -70,7 +84,12 @@ class Feed(Base):
     # 条件付きGET用。次回取得時に If-None-Match / If-Modified-Since として送る
     etag: Mapped[str | None] = mapped_column(String(512))
     last_modified: Mapped[str | None] = mapped_column(String(128))
+    # 所属グループ。NULL は未分類。グループを削除すると NULL に戻る
+    group_id: Mapped[int | None] = mapped_column(
+        ForeignKey("feed_groups.id", ondelete="SET NULL"), index=True
+    )
 
+    group: Mapped[FeedGroup | None] = relationship(back_populates="feeds")
     articles: Mapped[list["Article"]] = relationship(
         back_populates="feed", cascade="all, delete-orphan", passive_deletes=True
     )

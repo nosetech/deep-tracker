@@ -307,3 +307,24 @@ def test_update_url_failure(client, factory, handler, fn, code):
         assert feed.url == AWS_URL
         assert feed.etag == "keep"
         assert feed.name != "変えない"
+
+
+def test_add_with_group(client):
+    group = client.post("/api/feed-groups", json={"name": "AWS"}).json()
+    res = add(client, group_id=group["id"])
+    assert res.status_code == 201
+    assert res.json()["group_id"] == group["id"]
+    assert client.get("/api/feed-groups").json()[0]["feed_count"] == 1
+
+
+def test_add_without_group_is_ungrouped(client):
+    assert add(client).json()["group_id"] is None
+
+
+def test_add_with_unknown_group(client, factory):
+    res = add(client, group_id=999)
+    assert res.status_code == 422
+    assert res.json()["detail"]["code"] == "group_not_found"
+    # 取得・登録はしない
+    with factory() as s:
+        assert s.scalar(select(func.count()).select_from(Feed)) == 0

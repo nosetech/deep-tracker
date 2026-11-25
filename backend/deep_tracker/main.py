@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI
 
-from deep_tracker.api import ai_jobs, articles, config, feeds, health, summaries
+from deep_tracker.api import ai_jobs, articles, config, feed_groups, feeds, health, summaries
 from deep_tracker.api.deps import _session_factory
 
 
@@ -48,6 +48,7 @@ app.include_router(health.router, prefix="/api")
 app.include_router(ai_jobs.router, prefix="/api")
 app.include_router(config.router, prefix="/api")
 app.include_router(feeds.router, prefix="/api")
+app.include_router(feed_groups.router, prefix="/api")
 app.include_router(articles.router, prefix="/api")
 app.include_router(summaries.router, prefix="/api")
 

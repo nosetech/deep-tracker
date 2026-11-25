@@ -724,6 +724,7 @@ html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .nav-dot {
 .feed-list-head {
   display: flex;
   align-items: baseline;
+  flex-wrap: wrap;
   gap: 10px;
   margin: 26px 0 8px;
 }
@@ -940,6 +941,166 @@ html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .nav-dot {
   margin: 4px 0;
 }
 
+.feed-menu button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.feed-menu button:disabled:hover {
+  background: none;
+}
+
+/* ---- フィードのグループ（#125） ---- */
+.feed-add-group {
+  flex: 1 1 170px;
+  min-width: 0;
+  max-width: 100%;
+  height: 38px;
+  padding: 0 28px 0 10px;
+  border: 1px solid var(--line2);
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 13.5px;
+}
+
+.feed-add-newgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--tx2);
+}
+
+.feed-add-newgroup input {
+  width: 100%;
+  max-width: 360px;
+  box-sizing: border-box;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line2);
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--tx);
+  outline-color: var(--ac);
+}
+
+.feed-group-create {
+  margin-left: auto;
+  align-self: center;
+  height: 30px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.feed-group-create:hover {
+  background: var(--hover);
+}
+
+.feed-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.feed-group {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+}
+
+.feed-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 4px 2px;
+  border-bottom: 1px solid var(--line);
+  position: relative;
+}
+
+.feed-group-toggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  border: 0;
+  background: none;
+  padding: 8px 0;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+}
+
+.feed-group-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.feed-group-chev {
+  flex: none;
+  transition: transform 0.15s;
+}
+
+.feed-group-name {
+  font-size: 14.5px;
+  font-weight: 700;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.feed-group-count {
+  font-size: 12.5px;
+  color: var(--tx3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.feed-group-unread {
+  flex: none;
+  font-size: 12.5px;
+  color: var(--tx2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.feed-group-unread strong {
+  font-weight: 600;
+}
+
+.feed-group-head .btn-icon {
+  flex: none;
+}
+
+.feed-menu.feed-group-menu {
+  right: 2px;
+  top: 44px;
+  min-width: 240px;
+}
+
+.feed-group-empty {
+  padding: 16px 2px 16px 24px;
+  font-size: 13px;
+  color: var(--tx3);
+  border-bottom: 1px solid var(--line);
+}
+
+@media (max-width: 719px) {
+  .feed-add-newgroup input {
+    height: 40px;
+  }
+}
+
 /* ---- モーダル ---- */
 .modal-backdrop {
   position: fixed;
@@ -1006,6 +1167,24 @@ html[data-sidebar="collapsed"] .sidebar:not(.is-peek) .nav-dot {
   background: var(--bg);
   font-size: 14px;
   font-weight: 400;
+}
+
+.modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.modal-field-err {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--err);
+}
+
+.modal-field-err span {
+  text-wrap: pretty;
 }
 
 .modal-url {

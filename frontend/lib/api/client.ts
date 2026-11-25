@@ -4,8 +4,10 @@ import type {
   ArticleDetail,
   ArticleList,
   ArticleQuery,
+  BulkEnabledResult,
   BulkReadResult,
   Feed,
+  FeedGroup,
   FetchResult,
   GenerationState,
   MarkState,
@@ -61,8 +63,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   listFeeds: () => request<Feed[]>("/feeds"),
-  createFeed: (url: string) =>
-    request<Feed>("/feeds", { method: "POST", body: JSON.stringify({ url }) }),
+  createFeed: (url: string, groupId: number | null = null) =>
+    request<Feed>("/feeds", {
+      method: "POST",
+      body: JSON.stringify({ url, group_id: groupId }),
+    }),
   updateFeed: (
     id: number,
     body: {
@@ -70,6 +75,7 @@ export const api = {
       url?: string;
       fetch_interval_minutes?: number | null;
       enabled?: boolean;
+      group_id?: number | null;
     },
   ) =>
     request<Feed>(`/feeds/${id}`, {
@@ -82,6 +88,29 @@ export const api = {
     request<FetchResult>(`/feeds/${id}/fetch`, { method: "POST" }),
   markFeedRead: (id: number) =>
     request<BulkReadResult>(`/feeds/${id}/mark-read`, { method: "POST" }),
+  listFeedGroups: () => request<FeedGroup[]>("/feed-groups"),
+  createFeedGroup: (name: string) =>
+    request<FeedGroup>("/feed-groups", {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+  renameFeedGroup: (id: number, name: string) =>
+    request<FeedGroup>(`/feed-groups/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name }),
+    }),
+  deleteFeedGroup: (id: number) =>
+    request<void>(`/feed-groups/${id}`, { method: "DELETE" }),
+  /** id が null のときは未分類のフィードが対象 */
+  markFeedGroupRead: (id: number | null) =>
+    request<BulkReadResult>(`/feed-groups/${id ?? "ungrouped"}/mark-read`, {
+      method: "POST",
+    }),
+  setFeedGroupEnabled: (id: number | null, enabled: boolean) =>
+    request<BulkEnabledResult>(`/feed-groups/${id ?? "ungrouped"}/enabled`, {
+      method: "POST",
+      body: JSON.stringify({ enabled }),
+    }),
   markUnread: (articleIds: number[]) =>
     request<BulkReadResult>("/articles/mark-unread", {
       method: "POST",

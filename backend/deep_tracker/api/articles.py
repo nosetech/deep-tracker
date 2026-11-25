@@ -36,6 +36,7 @@ class ArticleFilter:
         unread_only: bool = False,
         marked_only: bool = False,
         feed_id: int | None = None,
+        group_id: int | None = Query(None, description="このグループに属するフィードの記事"),
         since: datetime | None = Query(None, description="この日時以降（含む）"),
         until: datetime | None = Query(None, description="この日時より前"),
         q: str | None = Query(
@@ -46,6 +47,7 @@ class ArticleFilter:
         self.unread_only = unread_only
         self.marked_only = marked_only
         self.feed_id = feed_id
+        self.group_id = group_id
         self.since = _as_utc(since)
         self.until = _as_utc(until)
         self.q = q
@@ -58,6 +60,8 @@ class ArticleFilter:
             conds.append(Article.is_marked.is_(True))
         if self.feed_id is not None:
             conds.append(Article.feed_id == self.feed_id)
+        if self.group_id is not None:
+            conds.append(Article.feed_id.in_(select(Feed.id).where(Feed.group_id == self.group_id)))
         if self.since is not None:
             conds.append(SORT_KEY >= self.since)
         if self.until is not None:
@@ -348,7 +352,7 @@ def set_mark(article_id: int, body: MarkUpdate, session: SessionDep) -> MarkStat
     return MarkState(id=article.id, is_marked=article.is_marked, marked_at=article.marked_at)
 
 
-def _mark_read(session: Session, conds: list[ColumnElement[bool]]) -> BulkReadResult:
+def mark_read_where(session: Session, conds: list[ColumnElement[bool]]) -> BulkReadResult:
     ids = list(
         session.scalars(
             select(Article.id).where(Article.is_read.is_(False), *conds).order_by(Article.id)
@@ -369,14 +373,14 @@ def _mark_read(session: Session, conds: list[ColumnElement[bool]]) -> BulkReadRe
 @router.post("/articles/mark-read", response_model=BulkReadResult)
 def mark_read(session: SessionDep, flt: FilterDep) -> BulkReadResult:
     """絞り込み条件に一致する未読記事をすべて既読にする。条件なしの場合は全記事が対象。"""
-    return _mark_read(session, flt.conditions())
+    return mark_read_where(session, flt.conditions())
 
 
 @router.post("/feeds/{feed_id}/mark-read", response_model=BulkReadResult)
 def mark_feed_read(feed_id: int, session: SessionDep) -> BulkReadResult:
     if session.get(Feed, feed_id) is None:
         raise HTTPException(status_code=404, detail="フィードが見つかりません")
-    return _mark_read(session, [Article.feed_id == feed_id])
+    return mark_read_where(session, [Article.feed_id == feed_id])
 
 
 @router.post("/articles/mark-unread", response_model=BulkReadResult)
