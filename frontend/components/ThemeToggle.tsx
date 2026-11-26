@@ -7,6 +7,19 @@ function readTheme(): Theme {
   return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
 }
 
+// 保存値（手動設定）があればそれを、なければ OS 設定を使う（theme.ts の themeInitScript と同じ判定。変更時は両方そろえる）
+function initialTheme(): Theme {
+  try {
+    const saved = localStorage.getItem(THEME_STORAGE_KEY);
+    if (saved === "light" || saved === "dark") return saved;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  } catch {
+    return "light";
+  }
+}
+
 // <html data-theme> を外部ストアとして購読する（SSR時は不明 = null。アイコンはCSSで出し分ける）
 function subscribe(onChange: () => void) {
   const observer = new MutationObserver(onChange);
@@ -23,6 +36,13 @@ export function ThemeToggle({ className }: { className?: string }) {
     readTheme,
     () => null,
   );
+
+  useEffect(() => {
+    // 属性が付かなかった・消えた（スクリプト未実行など）場合の保険として、保存値または OS 設定から設定し直す
+    if (!document.documentElement.dataset.theme) {
+      document.documentElement.dataset.theme = initialTheme();
+    }
+  }, []);
 
   useEffect(() => {
     // 手動設定がない間は OS のテーマ変更に追従する
